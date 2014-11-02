@@ -1,0 +1,4 @@
+mattools
+========
+
+Linear algebraic tools
