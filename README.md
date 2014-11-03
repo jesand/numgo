@@ -1,4 +1,4 @@
-mattools
+numgo
 ========
 
-Linear algebraic tools
+Linear algebraic tools for Go, based on the excellent NumPy library for Python.
