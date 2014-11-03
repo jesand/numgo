@@ -5,7 +5,12 @@ package matrix
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // A NDArray is an n-dimensional array of numbers which can be manipulated in
 // various ways. Concrete implementations can differ; for instance, sparse
@@ -21,12 +26,17 @@ type NDArray interface {
 	// Returns true if and only if any item is nonzero
 	Any() bool
 
-	// Apply a function to all elements
-	Apply(f func(float64) float64)
+	// Returns true if f is true for any array element
+	AnyF(f func(v float64) bool) bool
 
-	// Returns the array as a matrix. This is only possible for 1D and 2D arrays;
-	// 1D arrays of length n are converted into n x 1 vectors.
-	ToMatrix() Matrix
+	// Returns true if f is true for any pair of array elements in the same position
+	AnyF2(f func(v1, v2 float64) bool, other NDArray) bool
+
+	// Return the result of applying a function to all elements
+	Apply(f func(float64) float64) NDArray
+
+	// Get the matrix data as a 1D array
+	Array() []float64
 
 	// Create a new array by concatenating this with another array along the
 	// specified axis. The array shapes must be equal along all other axes.
@@ -54,20 +64,24 @@ type NDArray interface {
 	// Get an array element
 	Item(index ...int) float64
 
-	// Add a scalar value to each array element
-	ItemAdd(value float64)
+	// Return the result of adding a scalar value to each array element
+	ItemAdd(value float64) NDArray
 
-	// Divide each array element by a scalar value
-	ItemDiv(value float64)
+	// Return the result of dividing each array element by a scalar value
+	ItemDiv(value float64) NDArray
 
-	// Multiply each array element by a scalar value
-	ItemProd(value float64)
+	// Return the reuslt of multiplying each array element by a scalar value
+	ItemProd(value float64) NDArray
 
-	// Subtract a scalar value from each array element
-	ItemSub(value float64)
+	// Return the result of subtracting a scalar value from each array element
+	ItemSub(value float64) NDArray
 
 	// Set an array element
 	ItemSet(value float64, index ...int)
+
+	// Returns the array as a matrix. This is only possible for 1D and 2D arrays;
+	// 1D arrays of length n are converted into n x 1 vectors.
+	M() Matrix
 
 	// Get the value of the largest array element
 	Max() float64
@@ -81,8 +95,8 @@ type NDArray interface {
 	// The number of dimensions in the matrix
 	NDim() int
 
-	// Normalize the array to sum to 1, or do nothing if all items are 0.
-	Normalize()
+	// Return a copy of the array, normalized to sum to 1
+	Normalize() NDArray
 
 	// Get a 1D copy of the array, in 'C' order: rightmost axes change fastest
 	Ravel() NDArray
@@ -108,43 +122,40 @@ type NDArray interface {
 	// Return the same matrix, but with axes transposed. The same data is used,
 	// for speed and memory efficiency. Use Copy() to create a new array.
 	// A 1D array is unchanged; create a 2D analog to rotate a vector.
-	Transpose() NDArray
+	T() NDArray
 }
 
 // Create an array from literal data
-func A(shape []int, array ...float64) NDArray {
+func A(shape []int, values ...float64) NDArray {
 	size := 1
 	for _, sz := range shape {
 		size *= sz
 	}
-	if len(array) != size {
-		panic(fmt.Sprintf("Expected %d array elements but got %d", size, len(array)))
+	if len(values) != size {
+		panic(fmt.Sprintf("Expected %d array elements but got %d", size, len(values)))
 	}
-	return &DenseF64Array{
-		shape: shape,
-		array: array,
-	}
-}
-
-// Create a 1D array
-func A1(value []float64) NDArray {
 	array := &DenseF64Array{
-		shape: []int{len(value)},
-		array: make([]float64, len(value)),
+		shape: shape,
+		array: make([]float64, len(values)),
 	}
-	copy(array.array[:], value[:])
+	copy(array.array[:], values[:])
 	return array
 }
 
+// Create a 1D array
+func A1(values ...float64) NDArray {
+	return A([]int{len(values)}, values...)
+}
+
 // Create a 2D array
-func A2(value [][]float64) NDArray {
+func A2(values ...[]float64) NDArray {
 	array := &DenseF64Array{
-		shape: []int{len(value), len(value[0])},
-		array: make([]float64, len(value)*len(value[0])),
+		shape: []int{len(values), len(values[0])},
+		array: make([]float64, len(values)*len(values[0])),
 	}
 	for i0 := 0; i0 < array.shape[0]; i0++ {
 		for i1 := 0; i1 < array.shape[1]; i1++ {
-			array.ItemSet(value[i0][i1], i0, i1)
+			array.ItemSet(values[i0][i1], i0, i1)
 		}
 	}
 	return array
@@ -160,6 +171,16 @@ func Dense(size ...int) NDArray {
 		shape: size,
 		array: make([]float64, totalSize),
 	}
+}
+
+// Create a square array with the specified elements on the main diagonal, and
+// zero elsewhere.
+func Diag(diag ...float64) NDArray {
+	array := Zeros(len(diag), len(diag))
+	for i, v := range diag {
+		array.ItemSet(v, i, i)
+	}
+	return array
 }
 
 // Create an NDArray of float64 values, initialized to value
@@ -204,13 +225,28 @@ func I(size ...int) NDArray {
 	return array
 }
 
-// Create a dense NDArray of float64 values, initialized to random values
+// Create a dense NDArray of float64 values, initialized to uniformly random
+// values in [0, 1).
 func Rand(size ...int) NDArray {
 	array := Dense(size...)
 
 	max := array.Size()
 	for i := 0; i < max; i++ {
 		array.FlatItemSet(rand.Float64(), i)
+	}
+
+	return array
+}
+
+// Create a dense NDArray of float64 values, initialized to random values in
+// [-math.MaxFloat64, +math.MaxFloat64] distributed on the standard Normal
+// distribution.
+func RandN(size ...int) NDArray {
+	array := Dense(size...)
+
+	max := array.Size()
+	for i := 0; i < max; i++ {
+		array.FlatItemSet(rand.NormFloat64(), i)
 	}
 
 	return array

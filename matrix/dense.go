@@ -26,11 +26,23 @@ func (array DenseF64Array) Any() bool {
 	return Any(&array)
 }
 
-// Apply a function to all elements
-func (array DenseF64Array) Apply(f func(float64) float64) {
-	for i, val := range array.array {
-		array.array[i] = f(val)
+// Returns true if f is true for any array element
+func (array DenseF64Array) AnyF(f func(v float64) bool) bool {
+	return AnyF(&array, f)
+}
+
+// Returns true if f is true for any pair of array elements in the same position
+func (array DenseF64Array) AnyF2(f func(v1, v2 float64) bool, other NDArray) bool {
+	return AnyF2(&array, f, other)
+}
+
+// Return the result of applying a function to all elements
+func (array DenseF64Array) Apply(f func(float64) float64) NDArray {
+	result := array.copy()
+	for i, val := range result.array {
+		result.array[i] = f(val)
 	}
+	return result
 }
 
 // Get the matrix data as a 1D array
@@ -42,6 +54,8 @@ func (array DenseF64Array) Array() []float64 {
 func (array DenseF64Array) ColSet(col int, values []float64) {
 	if len(array.shape) != 2 {
 		panic(fmt.Sprintf("Can't ColSet a %d-dim array", len(array.shape)))
+	} else if col < 0 || col >= array.shape[1] {
+		panic(fmt.Sprintf("RowSet can't set col %d of a %d-col array", col, array.shape[1]))
 	} else if len(values) != array.shape[0] {
 		panic(fmt.Sprintf("ColSet has %d rows but got %d values", array.shape[0], len(values)))
 	}
@@ -67,6 +81,11 @@ func (array DenseF64Array) Concat(axis int, others ...NDArray) NDArray {
 
 // Returns a duplicate of this array
 func (array DenseF64Array) Copy() NDArray {
+	return array.copy()
+}
+
+// Returns a duplicate of this array, preserving type
+func (array DenseF64Array) copy() *DenseF64Array {
 	result := &DenseF64Array{
 		shape: make([]int, len(array.shape)),
 		array: make([]float64, len(array.array)),
@@ -81,6 +100,22 @@ func (array DenseF64Array) Copy() NDArray {
 	} else {
 		copy(result.shape[:], array.shape[:])
 		copy(result.array[:], array.array[:])
+	}
+	return result
+}
+
+// Get a column vector containing the main diagonal elements of the matrix
+func (array DenseF64Array) Diag() Matrix {
+	if len(array.shape) != 2 {
+		panic(fmt.Sprintf("Can't take diag of a %d-dim array", len(array.shape)))
+	}
+	size := array.shape[0]
+	if array.shape[1] < size {
+		size = array.shape[1]
+	}
+	result := Dense(size, 1).M()
+	for i := 0; i < size; i++ {
+		result.ItemSet(array.Item(i, i), i, 0)
 	}
 	return result
 }
@@ -137,31 +172,39 @@ func (array DenseF64Array) Item(index ...int) float64 {
 }
 
 // Add a scalar value to each array element
-func (array *DenseF64Array) ItemAdd(value float64) {
-	for idx := range array.array {
-		array.array[idx] += value
+func (array *DenseF64Array) ItemAdd(value float64) NDArray {
+	result := array.copy()
+	for idx := range result.array {
+		result.array[idx] += value
 	}
+	return result
 }
 
 // Divide each array element by a scalar value
-func (array *DenseF64Array) ItemDiv(value float64) {
-	for idx := range array.array {
-		array.array[idx] /= value
+func (array *DenseF64Array) ItemDiv(value float64) NDArray {
+	result := array.copy()
+	for idx := range result.array {
+		result.array[idx] /= value
 	}
+	return result
 }
 
 // Multiply each array element by a scalar value
-func (array *DenseF64Array) ItemProd(value float64) {
-	for idx := range array.array {
-		array.array[idx] *= value
+func (array *DenseF64Array) ItemProd(value float64) NDArray {
+	result := array.copy()
+	for idx := range result.array {
+		result.array[idx] *= value
 	}
+	return result
 }
 
 // Subtract a scalar value from each array element
-func (array *DenseF64Array) ItemSub(value float64) {
-	for idx := range array.array {
-		array.array[idx] -= value
+func (array *DenseF64Array) ItemSub(value float64) NDArray {
+	result := array.copy()
+	for idx := range result.array {
+		result.array[idx] -= value
 	}
+	return result
 }
 
 // Set an array element
@@ -211,9 +254,9 @@ func (array DenseF64Array) Norm(ord float64) float64 {
 	return Norm(&array, ord)
 }
 
-// Normalize the array to sum to 1, or do nothing if all items are 0.
-func (array *DenseF64Array) Normalize() {
-	Normalize(array)
+// Return a copy of the array, normalized to sum to 1
+func (array *DenseF64Array) Normalize() NDArray {
+	return Normalize(array)
 }
 
 // Return the element-wise product of this array and one or more others
@@ -230,11 +273,13 @@ func (array DenseF64Array) Ravel() NDArray {
 func (array DenseF64Array) RowSet(row int, values []float64) {
 	if len(array.shape) != 2 {
 		panic(fmt.Sprintf("Can't RowSet a %d-dim array", len(array.shape)))
+	} else if row < 0 || row >= array.shape[0] {
+		panic(fmt.Sprintf("RowSet can't set row %d of a %d-row array", row, array.shape[0]))
 	} else if len(values) != array.shape[1] {
 		panic(fmt.Sprintf("RowSet has %d columns but got %d values", array.shape[1], len(values)))
 	}
 	for col := 0; col < array.shape[1]; col++ {
-		array.ItemSet(values[row], row, col)
+		array.ItemSet(values[col], row, col)
 	}
 }
 
@@ -276,15 +321,16 @@ func (array DenseF64Array) Sum() float64 {
 
 // Returns the array as a matrix. This is only possible for 1D and 2D arrays;
 // 1D arrays of length n are converted into n x 1 vectors.
-func (array DenseF64Array) ToMatrix() Matrix {
+func (array DenseF64Array) M() Matrix {
 	switch array.NDim() {
 	default:
 		panic(fmt.Sprintf("Cannot convert a %d-dim array into a matrix", array.NDim()))
 
 	case 1:
 		return &DenseF64Array{
-			shape: []int{array.shape[0], 1},
-			array: array.array,
+			shape:     []int{array.shape[0], 1},
+			array:     array.array,
+			transpose: array.transpose,
 		}
 
 	case 2:
@@ -295,7 +341,7 @@ func (array DenseF64Array) ToMatrix() Matrix {
 // Return the same matrix, but with axes transposed. The same data is used,
 // for speed and memory efficiency. Use Copy() to create a new array.
 // A 1D array is unchanged; create a 2D analog to rotate a vector.
-func (array DenseF64Array) Transpose() NDArray {
+func (array DenseF64Array) T() NDArray {
 	switch len(array.shape) {
 	default:
 		panic(fmt.Sprintf("Can't take transpose of %d-dim array", len(array.shape)))

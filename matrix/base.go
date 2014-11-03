@@ -9,11 +9,13 @@ import (
 // an index of -1 refers to the final array element.
 func ndToFlat(shape []int, index []int) int {
 	if len(index) != len(shape) {
-		panic(fmt.Sprintf("Wrong number of indices for %d-dim array", len(shape)))
+		panic(fmt.Sprintf("Indices %v invalid for array shape %v", index, shape))
 	}
 	flat := 0
 	for i := range shape {
-		if index[i] < 0 {
+		if index[i] >= shape[i] {
+			panic(fmt.Sprintf("Indices %v invalid for array shape %v", index, shape))
+		} else if index[i] < 0 {
 			flat += index[i] + shape[i]
 		} else {
 			flat += index[i]
@@ -27,12 +29,15 @@ func ndToFlat(shape []int, index []int) int {
 
 // Get the indices for the specified flat index.
 func flatToNd(shape []int, flat int) []int {
+	size := 1
+	for _, v := range shape {
+		size *= v
+	}
 	if flat < 0 {
-		size := 1
-		for _, v := range shape {
-			size *= v
-		}
 		flat += size
+	}
+	if flat >= size {
+		panic(fmt.Sprintf("Flat index %v invalid for array shape %v", flat, shape))
 	}
 	index := make([]int, len(shape))
 	for axis := 0; axis < len(index); axis++ {
@@ -52,11 +57,11 @@ func Add(array NDArray, others ...NDArray) NDArray {
 	for _, o := range others {
 		sh2 := o.Shape()
 		if len(sh2) != len(sh) {
-			panic("Can't add arrays with differing dimensionality")
+			panic(fmt.Sprintf("Can't add arrays with shapes %v and %v", sh, sh2))
 		}
 		for i := range sh {
 			if sh[i] != sh2[i] {
-				panic("Can't add arrays with differing dimensionality")
+				panic(fmt.Sprintf("Can't add arrays with shapes %v and %v", sh, sh2))
 			}
 		}
 	}
@@ -94,13 +99,47 @@ func Any(array NDArray) bool {
 	return false
 }
 
-// Apply a function to all elements
-func Apply(array NDArray, f func(float64) float64) {
+// Returns true if f is true for any array element
+func AnyF(array NDArray, f func(v float64) bool) bool {
 	size := array.Size()
 	for i := 0; i < size; i++ {
-		value := f(array.FlatItem(i))
-		array.FlatItemSet(value, i)
+		if f(array.FlatItem(i)) {
+			return true
+		}
 	}
+	return false
+}
+
+// Returns true if f is true for any pair of array elements in the same position
+func AnyF2(array NDArray, f func(v1, v2 float64) bool, other NDArray) bool {
+	sh1 := array.Shape()
+	sh2 := other.Shape()
+	if len(sh1) != len(sh2) {
+		panic("AnyF() requires two arrays of the same shape")
+	}
+	for i := 0; i < len(sh1); i++ {
+		if sh1[i] != sh2[i] {
+			panic("AnyF() requires two arrays of the same shape")
+		}
+	}
+	size := array.Size()
+	for i := 0; i < size; i++ {
+		if f(array.FlatItem(i), other.FlatItem(i)) {
+			return true
+		}
+	}
+	return false
+}
+
+// Return the result of applying a function to all elements
+func Apply(array NDArray, f func(float64) float64) NDArray {
+	result := array.Copy()
+	size := result.Size()
+	for i := 0; i < size; i++ {
+		value := f(result.FlatItem(i))
+		result.FlatItemSet(value, i)
+	}
+	return result
 }
 
 // Create a new array by concatenating this with one or more others along the
@@ -188,11 +227,11 @@ func Div(array NDArray, others ...NDArray) NDArray {
 	for _, o := range others {
 		sh2 := o.Shape()
 		if len(sh2) != len(sh) {
-			panic("Can't add arrays with differing dimensionality")
+			panic(fmt.Sprintf("Can't divide arrays with shapes %v and %v", sh, sh2))
 		}
 		for i := range sh {
 			if sh[i] != sh2[i] {
-				panic("Can't add arrays with differing dimensionality")
+				panic(fmt.Sprintf("Can't divide arrays with shapes %v and %v", sh, sh2))
 			}
 		}
 	}
@@ -235,35 +274,43 @@ func Fill(array NDArray, value float64) {
 }
 
 // Add a scalar value to each array element
-func ItemAdd(array NDArray, value float64) {
-	size := array.Size()
+func ItemAdd(array NDArray, value float64) NDArray {
+	result := array.Copy()
+	size := result.Size()
 	for idx := 0; idx < size; idx++ {
-		array.FlatItemSet(array.FlatItem(idx)+value, idx)
+		result.FlatItemSet(result.FlatItem(idx)+value, idx)
 	}
+	return result
 }
 
 // Divide each array element by a scalar value
-func ItemDiv(array NDArray, value float64) {
-	size := array.Size()
+func ItemDiv(array NDArray, value float64) NDArray {
+	result := array.Copy()
+	size := result.Size()
 	for idx := 0; idx < size; idx++ {
-		array.FlatItemSet(array.FlatItem(idx)/value, idx)
+		result.FlatItemSet(result.FlatItem(idx)/value, idx)
 	}
+	return result
 }
 
 // Multiply each array element by a scalar value
-func ItemProd(array NDArray, value float64) {
-	size := array.Size()
+func ItemProd(array NDArray, value float64) NDArray {
+	result := array.Copy()
+	size := result.Size()
 	for idx := 0; idx < size; idx++ {
-		array.FlatItemSet(array.FlatItem(idx)*value, idx)
+		result.FlatItemSet(result.FlatItem(idx)*value, idx)
 	}
+	return result
 }
 
 // Subtract a scalar value from each array element
-func ItemSub(array NDArray, value float64) {
-	size := array.Size()
+func ItemSub(array NDArray, value float64) NDArray {
+	result := array.Copy()
+	size := result.Size()
 	for idx := 0; idx < size; idx++ {
-		array.FlatItemSet(array.FlatItem(idx)-value, idx)
+		result.FlatItemSet(result.FlatItem(idx)-value, idx)
 	}
+	return result
 }
 
 // Get the result of matrix multiplication between this and some other
@@ -273,7 +320,7 @@ func ItemSub(array NDArray, value float64) {
 // with C[i, j] = \sum_{k=1}^p A[i,k] * B[k,j].
 func MProd(array Matrix, others ...Matrix) Matrix {
 	if len(others) < 1 {
-		return array.Copy().ToMatrix()
+		return array.Copy().M()
 	} else if array.NDim() != 2 {
 		panic(fmt.Sprintf("Can't MProd on a %d-dim array; must be 2D", array.NDim()))
 	}
@@ -287,9 +334,9 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 		if len(rightSh) != 2 {
 			panic(fmt.Sprintf("Can't MProd a %d-dim array; must be 2D", len(rightSh)))
 		} else if leftSh[1] != rightSh[0] {
-			panic(fmt.Sprintf("Can't MProd a %d x %d to a %d x %d array; inner dimensions must match", leftSh[0], leftSh[1], rightSh[0], rightSh[1]))
+			panic(fmt.Sprintf("Can't MProd a %dx%d to a %dx%d array; inner dimensions must match", leftSh[0], leftSh[1], rightSh[0], rightSh[1]))
 		}
-		result = Dense(leftSh[0], rightSh[1]).ToMatrix()
+		result = Dense(leftSh[0], rightSh[1]).M()
 		for i := 0; i < leftSh[0]; i++ {
 			for j := 0; j < rightSh[1]; j++ {
 				value := 0.0
@@ -331,11 +378,13 @@ func Min(array NDArray) float64 {
 	return min
 }
 
-// Normalize the array to sum to 1, or do nothing if all items are 0.
-func Normalize(array NDArray) {
+// Return a copy of the array, normalized to sum to 1
+func Normalize(array NDArray) NDArray {
 	s := array.Sum()
 	if s != 0 && s != 1 {
-		array.ItemProd(1 / s)
+		return array.ItemDiv(s)
+	} else {
+		return array.Copy()
 	}
 }
 
@@ -346,11 +395,11 @@ func Prod(array NDArray, others ...NDArray) NDArray {
 	for _, o := range others {
 		sh2 := o.Shape()
 		if len(sh2) != len(sh) {
-			panic("Can't add arrays with differing dimensionality")
+			panic(fmt.Sprintf("Can't multiply arrays with shapes %v and %v", sh, sh2))
 		}
 		for i := range sh {
 			if sh[i] != sh2[i] {
-				panic("Can't add arrays with differing dimensionality")
+				panic(fmt.Sprintf("Can't multiply arrays with shapes %v and %v", sh, sh2))
 			}
 		}
 	}
@@ -440,11 +489,11 @@ func Sub(array NDArray, others ...NDArray) NDArray {
 	for _, o := range others {
 		sh2 := o.Shape()
 		if len(sh2) != len(sh) {
-			panic("Can't add arrays with differing dimensionality")
+			panic(fmt.Sprintf("Can't subtract arrays with shapes %v and %v", sh, sh2))
 		}
 		for i := range sh {
 			if sh[i] != sh2[i] {
-				panic("Can't add arrays with differing dimensionality")
+				panic(fmt.Sprintf("Can't subtract arrays with shapes %v and %v", sh, sh2))
 			}
 		}
 	}

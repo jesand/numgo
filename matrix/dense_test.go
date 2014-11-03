@@ -43,7 +43,7 @@ func Test1DArray(t *testing.T) {
 		})
 
 		Convey("When I call Normalize()", func() {
-			array.Normalize()
+			array = array.Normalize()
 
 			Convey("Item() returns all zeros", func() {
 				for i0 := 0; i0 < 5; i0++ {
@@ -95,7 +95,7 @@ func Test1DArray(t *testing.T) {
 			})
 
 			Convey("When I call Normalize", func() {
-				array.Normalize()
+				array = array.Normalize()
 
 				Convey("Item() is correct", func() {
 					for i0 := 0; i0 < 5; i0++ {
@@ -174,7 +174,7 @@ func Test1DArray(t *testing.T) {
 			})
 
 			Convey("When I call Normalize", func() {
-				array.Normalize()
+				array = array.Normalize()
 
 				Convey("Item() is correct", func() {
 					for i0 := 0; i0 < 5; i0++ {
@@ -324,7 +324,7 @@ func Test2DArray(t *testing.T) {
 		})
 
 		Convey("When I call Normalize()", func() {
-			array.Normalize()
+			array = array.Normalize()
 			Convey("Item() returns all zeros", func() {
 				for i0 := 0; i0 < 5; i0++ {
 					for i1 := 0; i1 < 3; i1++ {
@@ -378,7 +378,7 @@ func Test2DArray(t *testing.T) {
 			})
 
 			Convey("When I call Normalize", func() {
-				array.Normalize()
+				array = array.Normalize()
 
 				Convey("Item() is correct", func() {
 					for i0 := 0; i0 < 5; i0++ {
@@ -461,7 +461,7 @@ func Test2DArray(t *testing.T) {
 			})
 
 			Convey("When I call Normalize", func() {
-				array.Normalize()
+				array = array.Normalize()
 
 				Convey("Item() is correct", func() {
 					for i0 := 0; i0 < 5; i0++ {
@@ -481,8 +481,8 @@ func Test2DArray(t *testing.T) {
 	Convey("Given a random array with shape 5,3", t, func() {
 		array := Rand(5, 3)
 
-		Convey("When I call Transpose", func() {
-			tr := array.Transpose()
+		Convey("When I call T", func() {
+			tr := array.T()
 
 			Convey("The transpose shape is 3x5", func() {
 				So(tr.Shape(), ShouldResemble, []int{3, 5})
@@ -636,8 +636,8 @@ func Test2DArray(t *testing.T) {
 	})
 
 	Convey("Given a 2x3 and 3x4 array", t, func() {
-		left := Rand(2, 3).ToMatrix()
-		right := Rand(3, 4).ToMatrix()
+		left := Rand(2, 3).M()
+		right := Rand(3, 4).M()
 		Convey("MProd() works", func() {
 			result := left.MProd(right)
 			So(result.Shape(), ShouldResemble, []int{2, 4})
@@ -692,7 +692,7 @@ func Test3DArray(t *testing.T) {
 		})
 
 		Convey("When I call Normalize()", func() {
-			array.Normalize()
+			array = array.Normalize()
 			Convey("Item() returns all zeros", func() {
 				for i0 := 0; i0 < 5; i0++ {
 					for i1 := 0; i1 < 3; i1++ {
@@ -763,7 +763,7 @@ func Test3DArray(t *testing.T) {
 			})
 
 			Convey("When I call ItemAdd", func() {
-				array.ItemAdd(0.5)
+				array = array.ItemAdd(0.5)
 				Convey("Item() returns updates", func() {
 					for i0 := 0; i0 < 5; i0++ {
 						for i1 := 0; i1 < 3; i1++ {
@@ -784,7 +784,7 @@ func Test3DArray(t *testing.T) {
 			})
 
 			Convey("When I call ItemProd", func() {
-				array.ItemProd(2)
+				array = array.ItemProd(2)
 				Convey("Item() returns updates", func() {
 					for i0 := 0; i0 < 5; i0++ {
 						for i1 := 0; i1 < 3; i1++ {
@@ -805,7 +805,7 @@ func Test3DArray(t *testing.T) {
 			})
 
 			Convey("When I call Normalize", func() {
-				array.Normalize()
+				array = array.Normalize()
 
 				Convey("Item() is correct", func() {
 					for i0 := 0; i0 < 5; i0++ {
@@ -900,7 +900,7 @@ func Test3DArray(t *testing.T) {
 			})
 
 			Convey("When I call Normalize", func() {
-				array.Normalize()
+				array = array.Normalize()
 
 				Convey("Item() is correct", func() {
 					for i0 := 0; i0 < 5; i0++ {

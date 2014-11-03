@@ -9,14 +9,14 @@ import (
 type Matrix interface {
 	NDArray
 
-	// Get the matrix data as a 1D array
-	Array() []float64
-
 	// Set the values of the items on a given column
 	ColSet(col int, values []float64)
 
 	// Get the number of columns
 	Cols() int
+
+	// Get a column vector containing the main diagonal elements of the matrix
+	Diag() Matrix
 
 	// Get the matrix inverse
 	Inverse() Matrix
@@ -45,7 +45,7 @@ func M(shape []int, array ...float64) Matrix {
 	if len(shape) != 2 {
 		panic(fmt.Sprintf("A matrix should be 2D, not %dD", len(shape)))
 	}
-	return A(shape, array...).ToMatrix()
+	return A(shape, array...).M()
 }
 
 // Convert our matrix type to mat64's matrix type

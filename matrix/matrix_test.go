@@ -7,7 +7,7 @@ import (
 
 func TestConversion(t *testing.T) {
 	Convey("Given a Matrix", t, func() {
-		m := Rand(3, 5).ToMatrix()
+		m := Rand(3, 5).M()
 		Convey("Converting it toMat64 works", func() {
 			m2 := toMat64(m)
 			r, c := m2.Dims()
@@ -34,10 +34,10 @@ func TestConversion(t *testing.T) {
 
 func TestInverse(t *testing.T) {
 	Convey("Given an invertable square matrix", t, func() {
-		m := A2([][]float64{
+		m := A2(
 			[]float64{4, 7},
 			[]float64{2, 6},
-		}).ToMatrix()
+		).M()
 
 		Convey("When I take the inverse", func() {
 			mi := m.Inverse()
@@ -64,16 +64,16 @@ func TestInverse(t *testing.T) {
 
 func TestLDivide(t *testing.T) {
 	Convey("Given a simple division problem", t, func() {
-		a := A2([][]float64{
+		a := A2(
 			[]float64{8, 1, 6},
 			[]float64{3, 5, 7},
 			[]float64{4, 9, 2},
-		}).ToMatrix()
-		b := A2([][]float64{
+		).M()
+		b := A2(
 			[]float64{15},
 			[]float64{15},
 			[]float64{15},
-		}).ToMatrix()
+		).M()
 
 		Convey("When I solve the system", func() {
 			x := LDivide(a, b)
