@@ -337,13 +337,16 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 			panic(fmt.Sprintf("Can't MProd a %dx%d to a %dx%d array; inner dimensions must match", leftSh[0], leftSh[1], rightSh[0], rightSh[1]))
 		}
 		result = Dense(leftSh[0], rightSh[1]).M()
+		resArr := result.Array()
+		lArr := left.Array()
+		rArr := right.Array()
 		for i := 0; i < leftSh[0]; i++ {
 			for j := 0; j < rightSh[1]; j++ {
 				value := 0.0
 				for k := 0; k < leftSh[1]; k++ {
-					value += left.Item(i, k) * right.Item(k, j)
+					value += lArr[i*leftSh[1]+k] * rArr[k*rightSh[1]+j]
 				}
-				result.ItemSet(value, i, j)
+				resArr[i*rightSh[1]+j] = value
 			}
 		}
 		left = result

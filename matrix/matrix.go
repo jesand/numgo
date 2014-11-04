@@ -3,6 +3,7 @@ package matrix
 import (
 	"fmt"
 	"github.com/gonum/matrix/mat64"
+	"math"
 )
 
 // A two dimensional array with some special functionality
@@ -11,6 +12,9 @@ type Matrix interface {
 
 	// Set the values of the items on a given column
 	ColSet(col int, values []float64)
+
+	// Get a copy of a particular column
+	Col(col int) []float64
 
 	// Get the number of columns
 	Cols() int
@@ -35,6 +39,9 @@ type Matrix interface {
 
 	// Set the values of the items on a given row
 	RowSet(row int, values []float64)
+
+	// Get a particular row (not a copy)
+	Row(row int) []float64
 
 	// Get the number of rows
 	Rows() int
@@ -76,7 +83,13 @@ func Inverse(a Matrix) Matrix {
 
 // Solve for x, where ax = b.
 func LDivide(a, b Matrix) Matrix {
-	x := mat64.Solve(toMat64(a), toMat64(b))
+	var x *mat64.Dense
+	err := mat64.Maybe(func() {
+		x = mat64.Solve(toMat64(a), toMat64(b))
+	})
+	if err != nil {
+		return WithValue(math.NaN(), a.Shape()[0], b.Shape()[1]).M()
+	}
 	return toMatrix(x)
 }
 

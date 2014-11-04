@@ -64,6 +64,20 @@ func (array DenseF64Array) ColSet(col int, values []float64) {
 	}
 }
 
+// Get a copy of a particular column
+func (array DenseF64Array) Col(col int) []float64 {
+	if len(array.shape) != 2 {
+		panic(fmt.Sprintf("Can't get columns for a %d-dim array", len(array.shape)))
+	} else if col < 0 || col >= array.shape[1] {
+		panic(fmt.Sprintf("Can't get column %d from a %dx%d array", col, array.shape[0], array.shape[1]))
+	}
+	result := make([]float64, array.shape[1])
+	for row := 0; row < array.shape[0]; row++ {
+		result[row] = array.Item(row, col)
+	}
+	return result
+}
+
 // Get the number of columns
 func (array DenseF64Array) Cols() int {
 	if len(array.shape) != 2 {
@@ -281,6 +295,17 @@ func (array DenseF64Array) RowSet(row int, values []float64) {
 	for col := 0; col < array.shape[1]; col++ {
 		array.ItemSet(values[col], row, col)
 	}
+}
+
+// Get a particular row (not a copy)
+func (array DenseF64Array) Row(row int) []float64 {
+	if len(array.shape) != 2 {
+		panic(fmt.Sprintf("Can't get rows for a %d-dim array", len(array.shape)))
+	} else if row < 0 || row >= array.shape[0] {
+		panic(fmt.Sprintf("Can't get row %d from a %dx%d array", row, array.shape[0], array.shape[1]))
+	}
+	start := ndToFlat(array.shape, []int{row, 0})
+	return array.array[start : start+array.shape[1]]
 }
 
 // Get the number of rows
