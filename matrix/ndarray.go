@@ -1,6 +1,17 @@
 // The matrix package contains various utilities for dealing with raw matrices.
 // The interface is loosely based on the NumPy package in Python.
 //
+// The key interfaces here are:
+// * NDArray – A multidimensional array, with dense and (2D-only) sparse
+//             implementations.
+// * Matrix – A two-dimensional array, with various methods only available when
+//            working in two dimensions.  A two-dimensional NDArray can be
+//            trivially converted to the Matrix type by calling arr.M().
+//
+// When possible, function implementations take advantage of matrix sparsity.
+// For instance, MProd(), the matrix multiplication function, performs the
+// minimum amount of work required based on the types of its arguments.
+//
 // Certain linear algebra methods, particularly in the Matrix interface, rely
 // on BLAS. In order to use it, you will need to register an appropriate engine.
 // See the documentation at https://github.com/gonum/blas for details. You can
@@ -148,7 +159,9 @@ type NDArray interface {
 	// Get an array containing a rectangular slice of this array.
 	// `from` and `to` should both have one index per axis. The indices
 	// in `from` and `to` define the first and just-past-last indices you wish
-	// to select along each axis.
+	// to select along each axis. Negative indexing is supported: when slicing,
+	// index -1 refers to the item just past the last and -arr.Size() refers to
+	// the first element.
 	Slice(from []int, to []int) NDArray
 
 	// Ask whether the matrix has a sparse representation (useful for optimization)
