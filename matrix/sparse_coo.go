@@ -219,7 +219,7 @@ func (array *SparseCooF64Matrix) FlatIter() FlatNDArrayIterator {
 }
 
 // Get the matrix inverse
-func (array SparseCooF64Matrix) Inverse() Matrix {
+func (array SparseCooF64Matrix) Inverse() (Matrix, error) {
 	return Inverse(&array)
 }
 

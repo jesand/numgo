@@ -306,7 +306,8 @@ func TestInverse(t *testing.T) {
 		).M()
 
 		Convey("When I take the inverse", func() {
-			mi := m.Inverse()
+			mi, err := m.Inverse()
+			So(err, ShouldBeNil)
 
 			Convey("The inverse is correct", func() {
 				So(mi.Shape(), ShouldResemble, []int{2, 2})

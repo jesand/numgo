@@ -204,7 +204,7 @@ func (array *DenseF64Array) FlatIter() FlatNDArrayIterator {
 }
 
 // Get the matrix inverse
-func (array DenseF64Array) Inverse() Matrix {
+func (array DenseF64Array) Inverse() (Matrix, error) {
 	if len(array.shape) != 2 {
 		panic(fmt.Sprintf("Can't take inverse of a %d-dim array", len(array.shape)))
 	}

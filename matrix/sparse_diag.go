@@ -181,7 +181,7 @@ func (array *SparseDiagF64Matrix) FlatIter() FlatNDArrayIterator {
 }
 
 // Get the matrix inverse
-func (array SparseDiagF64Matrix) Inverse() Matrix {
+func (array SparseDiagF64Matrix) Inverse() (Matrix, error) {
 	return Inverse(&array)
 }
 

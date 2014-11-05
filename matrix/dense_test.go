@@ -8,6 +8,114 @@ import (
 // The smallest floating point difference permissible for near-equality
 const Eps float64 = 1e-9
 
+func TestDenseAddDivMulSub(t *testing.T) {
+	Convey("Given two dense matrices", t, func() {
+		d1 := A([]int{3, 4},
+			1, 2, 3, 4,
+			5, 6, 7, 8,
+			9, 10, 11, 12)
+		d2 := A([]int{3, 4},
+			11, 12, 13, 14,
+			15, 16, 17, 18,
+			19, 20, 21, 22)
+
+		Convey("Add works", func() {
+			a := d1.Add(d2)
+			So(a.Shape(), ShouldResemble, []int{3, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				12, 14, 16, 18,
+				20, 22, 24, 26,
+				28, 30, 32, 34,
+			})
+		})
+
+		Convey("Div works", func() {
+			a := d2.Div(d1)
+			So(a.Shape(), ShouldResemble, []int{3, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				11. / 1, 12. / 2, 13. / 3, 14. / 4,
+				15. / 5, 16. / 6, 17. / 7, 18. / 8,
+				19. / 9, 20. / 10, 21. / 11, 22. / 12,
+			})
+		})
+
+		Convey("Prod works", func() {
+			a := d2.Prod(d1)
+			So(a.Shape(), ShouldResemble, []int{3, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				11 * 1, 12 * 2, 13 * 3, 14 * 4,
+				15 * 5, 16 * 6, 17 * 7, 18 * 8,
+				19 * 9, 20 * 10, 21 * 11, 22 * 12,
+			})
+		})
+
+		Convey("Sub works", func() {
+			a := d2.Sub(d1)
+			So(a.Shape(), ShouldResemble, []int{3, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				10, 10, 10, 10,
+				10, 10, 10, 10,
+				10, 10, 10, 10,
+			})
+		})
+	})
+}
+
+func TestDenseAllAny(t *testing.T) {
+	Convey("Given full, half-full, and empty arrays", t, func() {
+		full := Rand(3, 4)
+		half := SparseRand(3, 4, .5).Dense()
+		empty := Zeros(3, 4)
+
+		Convey("All() is correct", func() {
+			So(full.All(), ShouldBeTrue)
+			So(half.All(), ShouldBeFalse)
+			So(empty.All(), ShouldBeFalse)
+		})
+
+		Convey("Any() is correct", func() {
+			So(full.Any(), ShouldBeTrue)
+			So(half.Any(), ShouldBeTrue)
+			So(empty.Any(), ShouldBeFalse)
+		})
+	})
+
+	Convey("Given pos, neg, and mixed arrays", t, func() {
+		pos := Ones(3, 4)
+		neg := WithValue(-1, 3, 4)
+		mixed := A([]int{3, 4},
+			1, 1, 1, 1,
+			-1, -1, -1, -1,
+			1, 1, 1, 1)
+		f := func(v float64) bool { return v > 0 }
+		f2 := func(v1, v2 float64) bool { return v1 > v2 }
+
+		Convey("AllF() is correct", func() {
+			So(pos.AllF(f), ShouldBeTrue)
+			So(mixed.AllF(f), ShouldBeFalse)
+			So(neg.AllF(f), ShouldBeFalse)
+		})
+
+		Convey("AnyF() is correct", func() {
+			So(pos.AnyF(f), ShouldBeTrue)
+			So(mixed.AnyF(f), ShouldBeTrue)
+			So(neg.AnyF(f), ShouldBeFalse)
+		})
+
+		Convey("AllF2() is correct", func() {
+			So(pos.AllF2(f2, neg), ShouldBeTrue)
+			So(mixed.AllF2(f2, neg), ShouldBeFalse)
+			So(neg.AllF2(f2, neg), ShouldBeFalse)
+		})
+
+		Convey("AnyF2() is correct", func() {
+			So(pos.AnyF2(f2, neg), ShouldBeTrue)
+			So(mixed.AnyF2(f2, neg), ShouldBeTrue)
+			So(neg.AnyF2(f2, neg), ShouldBeFalse)
+		})
+	})
+}
+
 func Test1DArray(t *testing.T) {
 	Convey("Given an array with shape 5", t, func() {
 		array := Dense(5)

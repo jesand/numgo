@@ -25,7 +25,7 @@ type Matrix interface {
 	Diag() Matrix
 
 	// Get the matrix inverse
-	Inverse() Matrix
+	Inverse() (Matrix, error)
 
 	// Solve for x, where ax = b and a is `this`.
 	LDivide(b Matrix) Matrix
@@ -183,17 +183,18 @@ func toMatrix(m mat64.Matrix) Matrix {
 }
 
 // Get the matrix inverse
-func Inverse(a Matrix) Matrix {
-	inv := mat64.Inverse(toMat64(a))
-	return toMatrix(inv)
+func Inverse(a Matrix) (Matrix, error) {
+	inv, err := mat64.Inverse(toMat64(a))
+	if err != nil {
+		return nil, err
+	}
+	return toMatrix(inv), nil
 }
 
 // Solve for x, where ax = b.
 func LDivide(a, b Matrix) Matrix {
 	var x *mat64.Dense
-	err := mat64.Maybe(func() {
-		x = mat64.Solve(toMat64(a), toMat64(b))
-	})
+	x, err := mat64.Solve(toMat64(a), toMat64(b))
 	if err != nil {
 		return WithValue(math.NaN(), a.Shape()[0], b.Shape()[1]).M()
 	}
