@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// A one-dimensional NDArray with dense representation
+// An n-dimensional NDArray with dense representation
 type DenseF64Array struct {
 	shape     []int
 	array     []float64
@@ -19,6 +19,16 @@ func (array DenseF64Array) Add(other ...NDArray) NDArray {
 // Returns true if and only if all items are nonzero
 func (array DenseF64Array) All() bool {
 	return All(&array)
+}
+
+// Returns true if f is true for all array elements
+func (array DenseF64Array) AllF(f func(v float64) bool) bool {
+	return AllF(&array, f)
+}
+
+// Returns true if f is true for all pairs of array elements in the same position
+func (array DenseF64Array) AllF2(f func(v1, v2 float64) bool, other NDArray) bool {
+	return AllF2(&array, f, other)
 }
 
 // Returns true if and only if any item is nonzero
@@ -45,7 +55,8 @@ func (array DenseF64Array) Apply(f func(float64) float64) NDArray {
 	return result
 }
 
-// Get the matrix data as a 1D array
+// Get the matrix data as a flattened 1D array; sparse matrices will make
+// a copy first.
 func (array DenseF64Array) Array() []float64 {
 	return array.array
 }
@@ -55,7 +66,7 @@ func (array DenseF64Array) ColSet(col int, values []float64) {
 	if len(array.shape) != 2 {
 		panic(fmt.Sprintf("Can't ColSet a %d-dim array", len(array.shape)))
 	} else if col < 0 || col >= array.shape[1] {
-		panic(fmt.Sprintf("RowSet can't set col %d of a %d-col array", col, array.shape[1]))
+		panic(fmt.Sprintf("ColSet can't set col %d of a %d-col array", col, array.shape[1]))
 	} else if len(values) != array.shape[0] {
 		panic(fmt.Sprintf("ColSet has %d rows but got %d values", array.shape[0], len(values)))
 	}
@@ -64,7 +75,7 @@ func (array DenseF64Array) ColSet(col int, values []float64) {
 	}
 }
 
-// Get a copy of a particular column
+// Get a particular column for read-only access. May or may not be a copy.
 func (array DenseF64Array) Col(col int) []float64 {
 	if len(array.shape) != 2 {
 		panic(fmt.Sprintf("Can't get columns for a %d-dim array", len(array.shape)))
@@ -118,6 +129,22 @@ func (array DenseF64Array) copy() *DenseF64Array {
 	return result
 }
 
+// Counts the number of nonzero elements in the array
+func (array DenseF64Array) CountNonzero() int {
+	count := 0
+	for _, v := range array.array {
+		if v != 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// Returns a dense copy of the array
+func (array DenseF64Array) Dense() NDArray {
+	return array.copy()
+}
+
 // Get a column vector containing the main diagonal elements of the matrix
 func (array DenseF64Array) Diag() Matrix {
 	if len(array.shape) != 2 {
@@ -134,7 +161,8 @@ func (array DenseF64Array) Diag() Matrix {
 	return result
 }
 
-// Return the element-wise quotient of this array and one or more others
+// Return the element-wise quotient of this array and one or more others.
+// This function defines 0 / 0 = 0, so it's useful for sparse arrays.
 func (array DenseF64Array) Div(other ...NDArray) NDArray {
 	return Div(&array, other...)
 }
@@ -165,6 +193,14 @@ func (array DenseF64Array) FlatItemSet(value float64, index int) {
 		index = ndToFlat([]int{array.shape[1], array.shape[0]}, []int{nd[1], nd[0]})
 	}
 	array.array[index] = value
+}
+
+// Return an iterator over populated matrix entries
+func (array *DenseF64Array) FlatIter() FlatNDArrayIterator {
+	return &denseIterator{
+		array:   array,
+		flatPos: 0,
+	}
 }
 
 // Get the matrix inverse
@@ -229,6 +265,14 @@ func (array DenseF64Array) ItemSet(value float64, index ...int) {
 		shape = []int{array.shape[1], array.shape[0]}
 	}
 	array.array[ndToFlat(shape, index)] = value
+}
+
+// Return an iterator over populated matrix entries
+func (array *DenseF64Array) Iter() CoordNDArrayIterator {
+	return &denseIterator{
+		array:   array,
+		flatPos: 0,
+	}
 }
 
 // Solve for x, where ax = b.
@@ -297,7 +341,7 @@ func (array DenseF64Array) RowSet(row int, values []float64) {
 	}
 }
 
-// Get a particular row (not a copy)
+// Get a particular row for read-only access. May or may not be a copy.
 func (array DenseF64Array) Row(row int) []float64 {
 	if len(array.shape) != 2 {
 		panic(fmt.Sprintf("Can't get rows for a %d-dim array", len(array.shape)))
@@ -332,6 +376,11 @@ func (array DenseF64Array) Size() int {
 // to select along each axis.
 func (array DenseF64Array) Slice(from []int, to []int) NDArray {
 	return Slice(&array, from, to)
+}
+
+// Ask whether the matrix has a sparse representation (useful for optimization)
+func (array DenseF64Array) Sparsity() ArraySparsity {
+	return DenseArray
 }
 
 // Return the element-wise difference of this array and one or more others
@@ -378,7 +427,38 @@ func (array DenseF64Array) T() NDArray {
 		return &DenseF64Array{
 			shape:     []int{array.shape[1], array.shape[0]},
 			array:     array.array,
-			transpose: true,
+			transpose: !array.transpose,
 		}
 	}
+}
+
+// Iterates over all array elements
+type denseIterator struct {
+	array   *DenseF64Array
+	flatPos int
+}
+
+// Ask whether there are more values to iterate over.
+func (iter denseIterator) HasNext() bool {
+	return iter.flatPos < len(iter.array.array)
+}
+
+// Return the value and coordinates of the next entry
+func (iter *denseIterator) Next() (float64, []int) {
+	if iter.flatPos >= len(iter.array.array) {
+		return 0, nil
+	}
+	flatPos := iter.flatPos
+	iter.flatPos++
+	return iter.array.array[flatPos], flatToNd(iter.array.shape, flatPos)
+}
+
+// Return the value and flat index of the next entry
+func (iter *denseIterator) FlatNext() (float64, int) {
+	if iter.flatPos >= len(iter.array.array) {
+		return 0, 0
+	}
+	flatPos := iter.flatPos
+	iter.flatPos++
+	return iter.array.array[flatPos], flatPos
 }

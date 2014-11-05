@@ -1,5 +1,14 @@
 // The matrix package contains various utilities for dealing with raw matrices.
 // The interface is loosely based on the NumPy package in Python.
+//
+// Certain linear algebra methods, particularly in the Matrix interface, rely
+// on BLAS. In order to use it, you will need to register an appropriate engine.
+// See the documentation at https://github.com/gonum/blas for details. You can
+// register a default (native Go) engine by calling InitDefaultBlas().
+// If you see a panic message like
+// "mat64: no blas engine registered: call Register()"
+// then you need to register a BLAS engine. If you don't see this error, then
+// you probably don't need to worry about it.
 package matrix
 
 import (
@@ -12,6 +21,15 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// ArraySparsity indicates the representation type of the matrix
+type ArraySparsity int
+
+const (
+	DenseArray ArraySparsity = iota
+	SparseCooMatrix
+	SparseDiagMatrix
+)
+
 // A NDArray is an n-dimensional array of numbers which can be manipulated in
 // various ways. Concrete implementations can differ; for instance, sparse
 // and dense representations are possible.
@@ -22,6 +40,12 @@ type NDArray interface {
 
 	// Returns true if and only if all items are nonzero
 	All() bool
+
+	// Returns true if f is true for all array elements
+	AllF(f func(v float64) bool) bool
+
+	// Returns true if f is true for all pairs of array elements in the same position
+	AllF2(f func(v1, v2 float64) bool, other NDArray) bool
 
 	// Returns true if and only if any item is nonzero
 	Any() bool
@@ -35,7 +59,8 @@ type NDArray interface {
 	// Return the result of applying a function to all elements
 	Apply(f func(float64) float64) NDArray
 
-	// Get the matrix data as a 1D array
+	// Get the matrix data as a flattened 1D array; sparse matrices will make
+	// a copy first.
 	Array() []float64
 
 	// Create a new array by concatenating this with another array along the
@@ -46,7 +71,14 @@ type NDArray interface {
 	// Returns a duplicate of this array
 	Copy() NDArray
 
-	// Return the element-wise quotient of this array and one or more others
+	// Counts the number of nonzero elements in the array
+	CountNonzero() int
+
+	// Returns a dense copy of the array
+	Dense() NDArray
+
+	// Return the element-wise quotient of this array and one or more others.
+	// This function defines 0 / 0 = 0, so it's useful for sparse arrays.
 	Div(others ...NDArray) NDArray
 
 	// Returns true if and only if all elements in the two arrays are equal
@@ -60,6 +92,9 @@ type NDArray interface {
 
 	// Set an array element in a flattened version of this array
 	FlatItemSet(value float64, index int)
+
+	// Return an iterator over populated matrix entries
+	FlatIter() FlatNDArrayIterator
 
 	// Get an array element
 	Item(index ...int) float64
@@ -78,6 +113,9 @@ type NDArray interface {
 
 	// Set an array element
 	ItemSet(value float64, index ...int)
+
+	// Return an iterator over populated matrix entries
+	Iter() CoordNDArrayIterator
 
 	// Returns the array as a matrix. This is only possible for 1D and 2D arrays;
 	// 1D arrays of length n are converted into n x 1 vectors.
@@ -112,6 +150,9 @@ type NDArray interface {
 	// in `from` and `to` define the first and just-past-last indices you wish
 	// to select along each axis.
 	Slice(from []int, to []int) NDArray
+
+	// Ask whether the matrix has a sparse representation (useful for optimization)
+	Sparsity() ArraySparsity
 
 	// Return the element-wise difference of this array and one or more others
 	Sub(others ...NDArray) NDArray
@@ -154,6 +195,9 @@ func A2(values ...[]float64) NDArray {
 		array: make([]float64, len(values)*len(values[0])),
 	}
 	for i0 := 0; i0 < array.shape[0]; i0++ {
+		if len(values[i0]) != array.shape[1] {
+			panic(fmt.Sprintf("A2 got inconsistent array lengths %d and %d", array.shape[1], len(values[i0])))
+		}
 		for i1 := 0; i1 < array.shape[1]; i1++ {
 			array.ItemSet(values[i0][i1], i0, i1)
 		}
@@ -173,16 +217,6 @@ func Dense(size ...int) NDArray {
 	}
 }
 
-// Create a square array with the specified elements on the main diagonal, and
-// zero elsewhere.
-func Diag(diag ...float64) NDArray {
-	array := Zeros(len(diag), len(diag))
-	for i, v := range diag {
-		array.ItemSet(v, i, i)
-	}
-	return array
-}
-
 // Create an NDArray of float64 values, initialized to value
 func WithValue(value float64, size ...int) NDArray {
 	array := Dense(size...)
@@ -198,31 +232,6 @@ func Zeros(size ...int) NDArray {
 // Create an NDArray of float64 values, initialized to one
 func Ones(size ...int) NDArray {
 	return WithValue(1.0, size...)
-}
-
-// Create an identity matrix of the specified dimensionality. If a single size
-// is used, a size x size identity matrix will be created.
-func I(size ...int) NDArray {
-	if len(size) == 1 {
-		size = []int{size[0], size[0]}
-	}
-	array := Dense(size...)
-
-	index := make([]int, len(size))
-	for i := 0; i < size[0]; i++ {
-		skip := false
-		for j := range index {
-			index[j] = i
-			if i >= size[j] {
-				skip = true
-			}
-		}
-		if !skip {
-			array.ItemSet(1.0, index...)
-		}
-	}
-
-	return array
 }
 
 // Create a dense NDArray of float64 values, initialized to uniformly random

@@ -13,7 +13,7 @@ func ndToFlat(shape []int, index []int) int {
 	}
 	flat := 0
 	for i := range shape {
-		if index[i] >= shape[i] {
+		if index[i] >= shape[i] || index[i] < -shape[i] {
 			panic(fmt.Sprintf("Indices %v invalid for array shape %v", index, shape))
 		} else if index[i] < 0 {
 			flat += index[i] + shape[i]
@@ -33,11 +33,11 @@ func flatToNd(shape []int, flat int) []int {
 	for _, v := range shape {
 		size *= v
 	}
+	if flat >= size || flat < -size {
+		panic(fmt.Sprintf("Flat index %v invalid for array shape %v", flat, shape))
+	}
 	if flat < 0 {
 		flat += size
-	}
-	if flat >= size {
-		panic(fmt.Sprintf("Flat index %v invalid for array shape %v", flat, shape))
 	}
 	index := make([]int, len(shape))
 	for axis := 0; axis < len(index); axis++ {
@@ -52,9 +52,18 @@ func flatToNd(shape []int, flat int) []int {
 
 // Return the element-wise sum of this array and one or more others
 func Add(array NDArray, others ...NDArray) NDArray {
-	result := array.Copy()
+	var result NDArray
+	sp := array.Sparsity()
 	sh := array.Shape()
 	for _, o := range others {
+		switch o.Sparsity() {
+		case DenseArray:
+			sp = DenseArray
+		case SparseCooMatrix:
+			if sp == SparseDiagMatrix {
+				sp = SparseCooMatrix
+			}
+		}
 		sh2 := o.Shape()
 		if len(sh2) != len(sh) {
 			panic(fmt.Sprintf("Can't add arrays with shapes %v and %v", sh, sh2))
@@ -65,10 +74,32 @@ func Add(array NDArray, others ...NDArray) NDArray {
 			}
 		}
 	}
+
 	size := array.Size()
+	switch sp {
+	case array.Sparsity():
+		result = array.Copy()
+	case DenseArray:
+		result = array.Dense()
+	case SparseCooMatrix:
+		result = SparseCoo(sh[0], sh[1])
+		for it := array.Iter(); it.HasNext(); {
+			v, idx := it.Next()
+			result.ItemSet(v, idx...)
+		}
+	}
 	for _, o := range others {
-		for idx := 0; idx < size; idx++ {
-			result.FlatItemSet(result.FlatItem(idx)+o.FlatItem(idx), idx)
+		switch o.Sparsity() {
+		case DenseArray:
+			for idx := 0; idx < size; idx++ {
+				result.FlatItemSet(result.FlatItem(idx)+o.FlatItem(idx), idx)
+			}
+
+		case SparseCooMatrix, SparseDiagMatrix:
+			for it := o.Iter(); it.HasNext(); {
+				v, idx := it.Next()
+				result.ItemSet(result.Item(idx...)+v, idx...)
+			}
 		}
 	}
 	return result
@@ -76,12 +107,53 @@ func Add(array NDArray, others ...NDArray) NDArray {
 
 // Returns true if and only if all items are nonzero
 func All(array NDArray) bool {
-	size := array.Size()
-	if size == 0 {
+	switch array.Sparsity() {
+	case SparseDiagMatrix:
 		return false
+	default:
+		return array.CountNonzero() == array.Size()
 	}
+}
+
+// Returns true if f is true for all array elements
+func AllF(array NDArray, f func(v float64) bool) bool {
+	switch array.Sparsity() {
+	case DenseArray:
+		for it := array.FlatIter(); it.HasNext(); {
+			if v, _ := it.FlatNext(); !f(v) {
+				return false
+			}
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		counted := 0
+		for it := array.Iter(); it.HasNext(); {
+			counted++
+			if v, _ := it.Next(); !f(v) {
+				return false
+			}
+		}
+		if counted < array.Size() && !f(0) {
+			return false
+		}
+	}
+	return true
+}
+
+// Returns true if f is true for all pairs of array elements in the same position
+func AllF2(array NDArray, f func(v1, v2 float64) bool, other NDArray) bool {
+	sh1 := array.Shape()
+	sh2 := other.Shape()
+	if len(sh1) != len(sh2) {
+		panic("AllF2() requires two arrays of the same shape")
+	}
+	for i := 0; i < len(sh1); i++ {
+		if sh1[i] != sh2[i] {
+			panic("AllF2() requires two arrays of the same shape")
+		}
+	}
+	size := array.Size()
 	for i := 0; i < size; i++ {
-		if array.FlatItem(i) == 0 {
+		if !f(array.FlatItem(i), other.FlatItem(i)) {
 			return false
 		}
 	}
@@ -90,10 +162,18 @@ func All(array NDArray) bool {
 
 // Returns true if and only if any item is nonzero
 func Any(array NDArray) bool {
-	size := array.Size()
-	for i := 0; i < size; i++ {
-		if array.FlatItem(i) != 0 {
-			return true
+	switch array.Sparsity() {
+	default:
+		for it := array.FlatIter(); it.HasNext(); {
+			if v, _ := it.FlatNext(); v != 0 {
+				return true
+			}
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		for it := array.Iter(); it.HasNext(); {
+			if v, _ := it.Next(); v != 0 {
+				return true
+			}
 		}
 	}
 	return false
@@ -115,11 +195,11 @@ func AnyF2(array NDArray, f func(v1, v2 float64) bool, other NDArray) bool {
 	sh1 := array.Shape()
 	sh2 := other.Shape()
 	if len(sh1) != len(sh2) {
-		panic("AnyF() requires two arrays of the same shape")
+		panic("AnyF2() requires two arrays of the same shape")
 	}
 	for i := 0; i < len(sh1); i++ {
 		if sh1[i] != sh2[i] {
-			panic("AnyF() requires two arrays of the same shape")
+			panic("AnyF2() requires two arrays of the same shape")
 		}
 	}
 	size := array.Size()
@@ -133,7 +213,7 @@ func AnyF2(array NDArray, f func(v1, v2 float64) bool, other NDArray) bool {
 
 // Return the result of applying a function to all elements
 func Apply(array NDArray, f func(float64) float64) NDArray {
-	result := array.Copy()
+	result := array.Dense()
 	size := result.Size()
 	for i := 0; i < size; i++ {
 		value := f(result.FlatItem(i))
@@ -147,7 +227,7 @@ func Apply(array NDArray, f func(float64) float64) NDArray {
 // It is legal to add a new axis.
 func Concat(axis int, array NDArray, others ...NDArray) NDArray {
 	if len(others) < 1 {
-		return array
+		return array.Copy()
 	}
 
 	// Calculate the new array shape
@@ -220,9 +300,9 @@ func Concat(axis int, array NDArray, others ...NDArray) NDArray {
 	return result
 }
 
-// Return the element-wise quotient of this array and one or more others
+// Return the element-wise quotient of this array and one or more others.
+// This function defines 0 / 0 = 0, so it's useful for sparse arrays.
 func Div(array NDArray, others ...NDArray) NDArray {
-	result := array.Copy()
 	sh := array.Shape()
 	for _, o := range others {
 		sh2 := o.Shape()
@@ -235,10 +315,26 @@ func Div(array NDArray, others ...NDArray) NDArray {
 			}
 		}
 	}
-	size := array.Size()
-	for _, o := range others {
-		for idx := 0; idx < size; idx++ {
-			result.FlatItemSet(result.FlatItem(idx)/o.FlatItem(idx), idx)
+
+	result := array.Copy()
+	switch result.Sparsity() {
+	default:
+		for _, o := range others {
+			for it := result.FlatIter(); it.HasNext(); {
+				v, idx := it.FlatNext()
+				if v != 0 {
+					result.FlatItemSet(v/o.FlatItem(idx), idx)
+				}
+			}
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		for _, o := range others {
+			for it := result.Iter(); it.HasNext(); {
+				v, idx := it.Next()
+				if v != 0 {
+					result.ItemSet(v/o.Item(idx...), idx...)
+				}
+			}
 		}
 	}
 	return result
@@ -256,9 +352,10 @@ func Equal(array, other NDArray) bool {
 			return false
 		}
 	}
+
 	size := array.Size()
-	for i := 0; i < size; i++ {
-		if array.FlatItem(i) != other.FlatItem(i) {
+	for idx := 0; idx < size; idx++ {
+		if array.FlatItem(idx) != other.FlatItem(idx) {
 			return false
 		}
 	}
@@ -267,6 +364,9 @@ func Equal(array, other NDArray) bool {
 
 // Set all array elements to the given value
 func Fill(array NDArray, value float64) {
+	if array.Sparsity() != DenseArray {
+		panic("Can't Fill() a sparse array")
+	}
 	size := array.Size()
 	for idx := 0; idx < size; idx++ {
 		array.FlatItemSet(value, idx)
@@ -275,7 +375,10 @@ func Fill(array NDArray, value float64) {
 
 // Add a scalar value to each array element
 func ItemAdd(array NDArray, value float64) NDArray {
-	result := array.Copy()
+	if value == 0 {
+		return array.Copy()
+	}
+	result := array.Dense()
 	size := result.Size()
 	for idx := 0; idx < size; idx++ {
 		result.FlatItemSet(result.FlatItem(idx)+value, idx)
@@ -285,27 +388,52 @@ func ItemAdd(array NDArray, value float64) NDArray {
 
 // Divide each array element by a scalar value
 func ItemDiv(array NDArray, value float64) NDArray {
+	if value == 1 {
+		return array.Copy()
+	}
 	result := array.Copy()
-	size := result.Size()
-	for idx := 0; idx < size; idx++ {
-		result.FlatItemSet(result.FlatItem(idx)/value, idx)
+	switch result.Sparsity() {
+	default:
+		size := result.Size()
+		for idx := 0; idx < size; idx++ {
+			result.FlatItemSet(result.FlatItem(idx)/value, idx)
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		for it := result.Iter(); it.HasNext(); {
+			v, idx := it.Next()
+			result.ItemSet(v/value, idx...)
+		}
 	}
 	return result
 }
 
 // Multiply each array element by a scalar value
 func ItemProd(array NDArray, value float64) NDArray {
+	if value == 1 {
+		return array.Copy()
+	}
 	result := array.Copy()
-	size := result.Size()
-	for idx := 0; idx < size; idx++ {
-		result.FlatItemSet(result.FlatItem(idx)*value, idx)
+	switch result.Sparsity() {
+	default:
+		size := result.Size()
+		for idx := 0; idx < size; idx++ {
+			result.FlatItemSet(result.FlatItem(idx)*value, idx)
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		for it := result.Iter(); it.HasNext(); {
+			v, idx := it.Next()
+			result.ItemSet(v*value, idx...)
+		}
 	}
 	return result
 }
 
 // Subtract a scalar value from each array element
 func ItemSub(array NDArray, value float64) NDArray {
-	result := array.Copy()
+	if value == 0 {
+		return array.Copy()
+	}
+	result := array.Dense()
 	size := result.Size()
 	for idx := 0; idx < size; idx++ {
 		result.FlatItemSet(result.FlatItem(idx)-value, idx)
@@ -321,36 +449,113 @@ func ItemSub(array NDArray, value float64) NDArray {
 func MProd(array Matrix, others ...Matrix) Matrix {
 	if len(others) < 1 {
 		return array.Copy().M()
-	} else if array.NDim() != 2 {
-		panic(fmt.Sprintf("Can't MProd on a %d-dim array; must be 2D", array.NDim()))
 	}
 	var (
 		left   = array
 		leftSh = array.Shape()
+		leftSp = array.Sparsity()
 		result Matrix
 	)
 	for _, right := range others {
 		rightSh := right.Shape()
-		if len(rightSh) != 2 {
-			panic(fmt.Sprintf("Can't MProd a %d-dim array; must be 2D", len(rightSh)))
-		} else if leftSh[1] != rightSh[0] {
+		rightSp := right.Sparsity()
+		if leftSh[1] != rightSh[0] {
 			panic(fmt.Sprintf("Can't MProd a %dx%d to a %dx%d array; inner dimensions must match", leftSh[0], leftSh[1], rightSh[0], rightSh[1]))
 		}
-		result = Dense(leftSh[0], rightSh[1]).M()
-		resArr := result.Array()
-		lArr := left.Array()
-		rArr := right.Array()
-		for i := 0; i < leftSh[0]; i++ {
-			for j := 0; j < rightSh[1]; j++ {
-				value := 0.0
-				for k := 0; k < leftSh[1]; k++ {
-					value += lArr[i*leftSh[1]+k] * rArr[k*rightSh[1]+j]
+
+		if leftSp == SparseDiagMatrix {
+			lDiag := left.Diag().Array()
+			switch rightSp {
+			case SparseDiagMatrix:
+				rDiag := right.Diag().Array()
+				resDiag := make([]float64, len(lDiag))
+				for idx, v := range lDiag {
+					resDiag[idx] = v * rDiag[idx]
 				}
-				resArr[i*rightSh[1]+j] = value
+				result = Diag(resDiag...)
+			case SparseCooMatrix:
+				resArr := make([]float64, leftSh[0]*rightSh[1])
+				for it := right.Iter(); it.HasNext(); {
+					v, idx := it.Next()
+					resArr[idx[0]*rightSh[1]+idx[1]] += lDiag[idx[0]] * v
+				}
+				result = SparseCoo(leftSh[0], rightSh[1])
+				for idx, v := range resArr {
+					if v != 0 {
+						result.FlatItemSet(v, idx)
+					}
+				}
+			default:
+				result = Dense(leftSh[0], rightSh[1]).M()
+				resArr := result.Array()
+				rArr := right.Array()
+				for i := 0; i < leftSh[0]; i++ {
+					for j := 0; j < rightSh[1]; j++ {
+						resArr[i*rightSh[1]+j] = lDiag[i] * rArr[i*rightSh[1]+j]
+					}
+				}
+			}
+
+		} else if leftSp == SparseCooMatrix && rightSp == SparseCooMatrix {
+			resArr := make([]float64, leftSh[0]*rightSh[1])
+			rArr := right.Array()
+			for it := left.Iter(); it.HasNext(); {
+				v, idx := it.Next()
+				for j := 0; j < rightSh[1]; j++ {
+					resArr[idx[0]*rightSh[1]+j] += v * rArr[idx[1]*rightSh[1]+j]
+				}
+			}
+			result = SparseCoo(leftSh[0], rightSh[1])
+			for idx, v := range resArr {
+				if v != 0 {
+					result.FlatItemSet(v, idx)
+				}
+			}
+
+		} else if rightSp == SparseDiagMatrix {
+			rDiag := right.Diag().Array()
+			if leftSp == SparseCooMatrix {
+				resArr := make([]float64, leftSh[0]*rightSh[1])
+				for it := left.Iter(); it.HasNext(); {
+					v, idx := it.Next()
+					resArr[idx[0]*rightSh[1]+idx[1]] += v * rDiag[idx[1]]
+				}
+				result = SparseCoo(leftSh[0], rightSh[1])
+				for idx, v := range resArr {
+					if v != 0 {
+						result.FlatItemSet(v, idx)
+					}
+				}
+			} else {
+				result = Dense(leftSh[0], rightSh[1]).M()
+				resArr := result.Array()
+				lArr := left.Array()
+				for i := 0; i < leftSh[0]; i++ {
+					for j := 0; j < rightSh[1]; j++ {
+						resArr[i*rightSh[1]+j] = lArr[i*leftSh[1]+j] * rDiag[j]
+					}
+				}
+			}
+
+		} else {
+			result = Dense(leftSh[0], rightSh[1]).M()
+			resArr := result.Array()
+			lArr := left.Array()
+			rArr := right.Array()
+			for i := 0; i < leftSh[0]; i++ {
+				for j := 0; j < rightSh[1]; j++ {
+					value := 0.0
+					for k := 0; k < leftSh[1]; k++ {
+						value += lArr[i*leftSh[1]+k] * rArr[k*rightSh[1]+j]
+					}
+					resArr[i*rightSh[1]+j] = value
+				}
 			}
 		}
+
 		left = result
 		leftSh = result.Shape()
+		leftSp = result.Sparsity()
 	}
 	return result
 }
@@ -358,11 +563,25 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 // Get the value of the largest array element
 func Max(array NDArray) float64 {
 	max := math.Inf(-1)
-	size := array.Size()
-	for i := 0; i < size; i++ {
-		v := array.FlatItem(i)
-		if v > max {
-			max = v
+	switch array.Sparsity() {
+	default:
+		size := array.Size()
+		for idx := 0; idx < size; idx++ {
+			v := array.FlatItem(idx)
+			if v > max {
+				max = v
+			}
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		counted := 0
+		for it := array.Iter(); it.HasNext(); {
+			if v, _ := it.Next(); v > max {
+				max = v
+			}
+			counted++
+		}
+		if max < 0 && counted < array.Size() {
+			max = 0
 		}
 	}
 	return max
@@ -371,11 +590,25 @@ func Max(array NDArray) float64 {
 // Get the value of the smallest array element
 func Min(array NDArray) float64 {
 	min := math.Inf(+1)
-	size := array.Size()
-	for i := 0; i < size; i++ {
-		v := array.FlatItem(i)
-		if v < min {
-			min = v
+	switch array.Sparsity() {
+	default:
+		size := array.Size()
+		for idx := 0; idx < size; idx++ {
+			v := array.FlatItem(idx)
+			if v < min {
+				min = v
+			}
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		counted := 0
+		for it := array.Iter(); it.HasNext(); {
+			if v, _ := it.Next(); v < min {
+				min = v
+			}
+			counted++
+		}
+		if min > 0 && counted < array.Size() {
+			min = 0
 		}
 	}
 	return min
@@ -393,7 +626,6 @@ func Normalize(array NDArray) NDArray {
 
 // Return the element-wise product of this array and one or more others
 func Prod(array NDArray, others ...NDArray) NDArray {
-	result := array.Copy()
 	sh := array.Shape()
 	for _, o := range others {
 		sh2 := o.Shape()
@@ -406,10 +638,22 @@ func Prod(array NDArray, others ...NDArray) NDArray {
 			}
 		}
 	}
-	size := array.Size()
-	for _, o := range others {
-		for idx := 0; idx < size; idx++ {
-			result.FlatItemSet(result.FlatItem(idx)*o.FlatItem(idx), idx)
+
+	result := array.Copy()
+	switch result.Sparsity() {
+	case DenseArray:
+		for _, o := range others {
+			for it := result.FlatIter(); it.HasNext(); {
+				v, idx := it.FlatNext()
+				result.FlatItemSet(v*o.FlatItem(idx), idx)
+			}
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		for _, o := range others {
+			for it := result.Iter(); it.HasNext(); {
+				v, idx := it.Next()
+				result.ItemSet(v*o.Item(idx...), idx...)
+			}
 		}
 	}
 	return result
@@ -418,9 +662,9 @@ func Prod(array NDArray, others ...NDArray) NDArray {
 // Get a 1D copy of the array, in 'C' order: rightmost axes change fastest
 func Ravel(array NDArray) NDArray {
 	result := Dense(array.Size())
-	size := array.Size()
-	for i := 0; i < size; i++ {
-		result.FlatItemSet(array.FlatItem(i), i)
+	for it := array.FlatIter(); it.HasNext(); {
+		v, idx := it.FlatNext()
+		result.FlatItemSet(v, idx)
 	}
 	return result
 }
@@ -487,23 +731,54 @@ func Slice(array NDArray, from []int, to []int) NDArray {
 
 // Return the element-wise difference of this array and one or more others
 func Sub(array NDArray, others ...NDArray) NDArray {
-	result := array.Copy()
+	var result NDArray
+	sp := array.Sparsity()
 	sh := array.Shape()
 	for _, o := range others {
+		switch o.Sparsity() {
+		case DenseArray:
+			sp = DenseArray
+		case SparseCooMatrix:
+			if sp == SparseDiagMatrix {
+				sp = SparseCooMatrix
+			}
+		}
 		sh2 := o.Shape()
 		if len(sh2) != len(sh) {
-			panic(fmt.Sprintf("Can't subtract arrays with shapes %v and %v", sh, sh2))
+			panic(fmt.Sprintf("Can't add arrays with shapes %v and %v", sh, sh2))
 		}
 		for i := range sh {
 			if sh[i] != sh2[i] {
-				panic(fmt.Sprintf("Can't subtract arrays with shapes %v and %v", sh, sh2))
+				panic(fmt.Sprintf("Can't add arrays with shapes %v and %v", sh, sh2))
 			}
 		}
 	}
+
 	size := array.Size()
+	switch sp {
+	case array.Sparsity():
+		result = array.Copy()
+	case DenseArray:
+		result = array.Dense()
+	case SparseCooMatrix:
+		result = SparseCoo(sh[0], sh[1])
+		for it := array.Iter(); it.HasNext(); {
+			v, idx := it.Next()
+			result.ItemSet(v, idx...)
+		}
+	}
 	for _, o := range others {
-		for idx := 0; idx < size; idx++ {
-			result.FlatItemSet(result.FlatItem(idx)-o.FlatItem(idx), idx)
+		switch o.Sparsity() {
+		case DenseArray:
+			for idx := 0; idx < size; idx++ {
+				result.FlatItemSet(result.FlatItem(idx)-o.FlatItem(idx), idx)
+			}
+
+		case SparseCooMatrix, SparseDiagMatrix:
+			for it := o.Iter(); it.HasNext(); {
+				v, idx := it.Next()
+				result.ItemSet(result.Item(idx...)-v, idx...)
+			}
 		}
 	}
 	return result
@@ -512,9 +787,17 @@ func Sub(array NDArray, others ...NDArray) NDArray {
 // Return the sum of all array elements
 func Sum(array NDArray) float64 {
 	var result float64
-	size := array.Size()
-	for i := 0; i < size; i++ {
-		result += array.FlatItem(i)
+	switch array.Sparsity() {
+	default:
+		for it := array.FlatIter(); it.HasNext(); {
+			v, _ := it.FlatNext()
+			result += v
+		}
+	case SparseCooMatrix, SparseDiagMatrix:
+		for it := array.Iter(); it.HasNext(); {
+			v, _ := it.Next()
+			result += v
+		}
 	}
 	return result
 }
