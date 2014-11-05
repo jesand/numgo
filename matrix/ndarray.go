@@ -3,10 +3,10 @@
 //
 // The key interfaces here are:
 // * NDArray – A multidimensional array, with dense and (2D-only) sparse
-//             implementations.
+//   implementations.
 // * Matrix – A two-dimensional array, with various methods only available when
-//            working in two dimensions.  A two-dimensional NDArray can be
-//            trivially converted to the Matrix type by calling arr.M().
+//   working in two dimensions.  A two-dimensional NDArray can be
+//   trivially converted to the Matrix type by calling arr.M().
 //
 // When possible, function implementations take advantage of matrix sparsity.
 // For instance, MProd(), the matrix multiplication function, performs the
