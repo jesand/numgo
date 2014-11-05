@@ -2,6 +2,7 @@
 // The interface is loosely based on the NumPy package in Python.
 //
 // The key interfaces here are:
+//
 // * NDArray – A multidimensional array, with dense and (2D-only) sparse
 //   implementations.
 // * Matrix – A two-dimensional array, with various methods only available when
