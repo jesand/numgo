@@ -1,16 +1,19 @@
 language: go
+env:
+  global:
+    secure: KK6vIoQwfFjr7BZZgVRaTMr9XkaJmNOXoQUPBoin3dElMhDGPlIMf5R2DaN/+mUwHM5q1eqdqRfHMThoff4aCkQHkHiHBdde2/k2JGJOUWl2jKmODbEIX7gMOVhF4EM85eQ5G1y5zqw/H1+oYqaZko8GSnG9mNLLIf2/HT19lWw=
 notifications:
   email:
     recipients: jesse@ccs.neu.edu
     on_success: change
     on_failure: always
 go:
-  - tip
+- tip
 before_script:
-  - go get github.com/smartystreets/goconvey/convey
+- go get github.com/smartystreets/goconvey/convey
 before_install:
-  - go get github.com/axw/gocov/gocov
-  - go get github.com/mattn/goveralls
-  - go get code.google.com/p/go.tools/cmd/cover
+- go get github.com/axw/gocov/gocov
+- go get github.com/mattn/goveralls
+- go get code.google.com/p/go.tools/cmd/cover
 script:
-    - $HOME/gopath/bin/goveralls -repotoken BC8meAip6fqKl9Wr2yxrfs5jhfGPK0N8w
+- $HOME/gopath/bin/goveralls -package ./... -repotoken $COVERALLS_TOKEN
