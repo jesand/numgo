@@ -58,14 +58,16 @@ func (array DenseF64Array) Apply(f func(float64) float64) NDArray {
 // Get the matrix data as a flattened 1D array; sparse matrices will make
 // a copy first.
 func (array DenseF64Array) Array() []float64 {
-	return array.array
+	if array.transpose {
+		return array.copy().array
+	} else {
+		return array.array
+	}
 }
 
 // Set the values of the items on a given column
 func (array DenseF64Array) ColSet(col int, values []float64) {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't ColSet a %d-dim array", len(array.shape)))
-	} else if col < 0 || col >= array.shape[1] {
+	if col < 0 || col >= array.shape[1] {
 		panic(fmt.Sprintf("ColSet can't set col %d of a %d-col array", col, array.shape[1]))
 	} else if len(values) != array.shape[0] {
 		panic(fmt.Sprintf("ColSet has %d rows but got %d values", array.shape[0], len(values)))
@@ -77,12 +79,10 @@ func (array DenseF64Array) ColSet(col int, values []float64) {
 
 // Get a particular column for read-only access. May or may not be a copy.
 func (array DenseF64Array) Col(col int) []float64 {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't get columns for a %d-dim array", len(array.shape)))
-	} else if col < 0 || col >= array.shape[1] {
+	if col < 0 || col >= array.shape[1] {
 		panic(fmt.Sprintf("Can't get column %d from a %dx%d array", col, array.shape[0], array.shape[1]))
 	}
-	result := make([]float64, array.shape[1])
+	result := make([]float64, array.shape[0])
 	for row := 0; row < array.shape[0]; row++ {
 		result[row] = array.Item(row, col)
 	}
@@ -91,9 +91,6 @@ func (array DenseF64Array) Col(col int) []float64 {
 
 // Get the number of columns
 func (array DenseF64Array) Cols() int {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't count columns for a %d-dim array", len(array.shape)))
-	}
 	return array.shape[1]
 }
 
@@ -115,15 +112,14 @@ func (array DenseF64Array) copy() *DenseF64Array {
 		shape: make([]int, len(array.shape)),
 		array: make([]float64, len(array.array)),
 	}
+	copy(result.shape[:], array.shape[:])
 	if array.transpose {
-		result.shape[0], result.shape[1] = array.shape[1], array.shape[0]
 		for i0 := 0; i0 < array.shape[0]; i0++ {
 			for i1 := 0; i1 < array.shape[1]; i1++ {
 				result.ItemSet(array.Item(i0, i1), i0, i1)
 			}
 		}
 	} else {
-		copy(result.shape[:], array.shape[:])
 		copy(result.array[:], array.array[:])
 	}
 	return result
@@ -147,9 +143,6 @@ func (array DenseF64Array) Dense() NDArray {
 
 // Get a column vector containing the main diagonal elements of the matrix
 func (array DenseF64Array) Diag() Matrix {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't take diag of a %d-dim array", len(array.shape)))
-	}
 	size := array.shape[0]
 	if array.shape[1] < size {
 		size = array.shape[1]
@@ -205,9 +198,6 @@ func (array *DenseF64Array) FlatIter() FlatNDArrayIterator {
 
 // Get the matrix inverse
 func (array DenseF64Array) Inverse() (Matrix, error) {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't take inverse of a %d-dim array", len(array.shape)))
-	}
 	return Inverse(&array)
 }
 
@@ -277,9 +267,6 @@ func (array *DenseF64Array) Iter() CoordNDArrayIterator {
 
 // Solve for x, where ax = b.
 func (array DenseF64Array) LDivide(b Matrix) Matrix {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't LDivide a %d-dim array", len(array.shape)))
-	}
 	return LDivide(&array, b)
 }
 
@@ -329,9 +316,7 @@ func (array DenseF64Array) Ravel() NDArray {
 
 // Set the values of the items on a given row
 func (array DenseF64Array) RowSet(row int, values []float64) {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't RowSet a %d-dim array", len(array.shape)))
-	} else if row < 0 || row >= array.shape[0] {
+	if row < 0 || row >= array.shape[0] {
 		panic(fmt.Sprintf("RowSet can't set row %d of a %d-row array", row, array.shape[0]))
 	} else if len(values) != array.shape[1] {
 		panic(fmt.Sprintf("RowSet has %d columns but got %d values", array.shape[1], len(values)))
@@ -343,9 +328,7 @@ func (array DenseF64Array) RowSet(row int, values []float64) {
 
 // Get a particular row for read-only access. May or may not be a copy.
 func (array DenseF64Array) Row(row int) []float64 {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't get rows for a %d-dim array", len(array.shape)))
-	} else if row < 0 || row >= array.shape[0] {
+	if row < 0 || row >= array.shape[0] {
 		panic(fmt.Sprintf("Can't get row %d from a %dx%d array", row, array.shape[0], array.shape[1]))
 	}
 	start := ndToFlat(array.shape, []int{row, 0})
@@ -354,9 +337,6 @@ func (array DenseF64Array) Row(row int) []float64 {
 
 // Get the number of rows
 func (array DenseF64Array) Rows() int {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't count rows for a %d-dim array", len(array.shape)))
-	}
 	return array.shape[0]
 }
 
@@ -414,21 +394,11 @@ func (array DenseF64Array) M() Matrix {
 
 // Return the same matrix, but with axes transposed. The same data is used,
 // for speed and memory efficiency. Use Copy() to create a new array.
-// A 1D array is unchanged; create a 2D analog to rotate a vector.
-func (array DenseF64Array) T() NDArray {
-	switch len(array.shape) {
-	default:
-		panic(fmt.Sprintf("Can't take transpose of %d-dim array", len(array.shape)))
-
-	case 1:
-		return &array
-
-	case 2:
-		return &DenseF64Array{
-			shape:     []int{array.shape[1], array.shape[0]},
-			array:     array.array,
-			transpose: !array.transpose,
-		}
+func (array DenseF64Array) T() Matrix {
+	return &DenseF64Array{
+		shape:     []int{array.shape[1], array.shape[0]},
+		array:     array.array,
+		transpose: !array.transpose,
 	}
 }
 
@@ -450,6 +420,9 @@ func (iter *denseIterator) Next() (float64, []int) {
 	}
 	flatPos := iter.flatPos
 	iter.flatPos++
+	if iter.array.transpose {
+		return iter.array.FlatItem(flatPos), flatToNd(iter.array.shape, flatPos)
+	}
 	return iter.array.array[flatPos], flatToNd(iter.array.shape, flatPos)
 }
 
@@ -460,5 +433,8 @@ func (iter *denseIterator) FlatNext() (float64, int) {
 	}
 	flatPos := iter.flatPos
 	iter.flatPos++
+	if iter.array.transpose {
+		return iter.array.FlatItem(flatPos), flatPos
+	}
 	return iter.array.array[flatPos], flatPos
 }

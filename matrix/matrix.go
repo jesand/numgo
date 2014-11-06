@@ -47,6 +47,10 @@ type Matrix interface {
 
 	// Get the number of rows
 	Rows() int
+
+	// Return the same matrix, but with axes transposed. The same data is used,
+	// for speed and memory efficiency. Use Copy() to create a new array.
+	T() Matrix
 }
 
 // Create a square matrix with the specified elements on the main diagonal, and

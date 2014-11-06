@@ -174,11 +174,6 @@ type NDArray interface {
 
 	// Return the sum of all array elements
 	Sum() float64
-
-	// Return the same matrix, but with axes transposed. The same data is used,
-	// for speed and memory efficiency. Use Copy() to create a new array.
-	// A 1D array is unchanged; create a 2D analog to rotate a vector.
-	T() NDArray
 }
 
 // Create an array from literal data

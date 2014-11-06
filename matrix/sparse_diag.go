@@ -18,7 +18,7 @@ func (array SparseDiagF64Matrix) Add(other ...NDArray) NDArray {
 
 // Returns true if and only if all items are nonzero
 func (array SparseDiagF64Matrix) All() bool {
-	return All(&array)
+	return false
 }
 
 // Returns true if f is true for all array elements
@@ -33,7 +33,12 @@ func (array SparseDiagF64Matrix) AllF2(f func(v1, v2 float64) bool, other NDArra
 
 // Returns true if and only if any item is nonzero
 func (array SparseDiagF64Matrix) Any() bool {
-	return Any(&array)
+	for _, v := range array.diag {
+		if v != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Returns true if f is true for any array element
@@ -398,7 +403,7 @@ func (array SparseDiagF64Matrix) M() Matrix {
 
 // Return the same matrix, but with axes transposed. The same data is used,
 // for speed and memory efficiency. Use Copy() to create a new array.
-func (array SparseDiagF64Matrix) T() NDArray {
+func (array SparseDiagF64Matrix) T() Matrix {
 	return &array
 }
 

@@ -1,7 +1,7 @@
 language: go
 env:
   global:
-    secure: KK6vIoQwfFjr7BZZgVRaTMr9XkaJmNOXoQUPBoin3dElMhDGPlIMf5R2DaN/+mUwHM5q1eqdqRfHMThoff4aCkQHkHiHBdde2/k2JGJOUWl2jKmODbEIX7gMOVhF4EM85eQ5G1y5zqw/H1+oYqaZko8GSnG9mNLLIf2/HT19lWw=
+    secure: PEHwJg5ncCwVZcHRkFgTXYMIQHjuU6u6u/Z8ZoAOU8qvHsNanMQhKQaT4kyBfE4Ls/sNXPO53Li/ROWAR75fx4hqrRgQgT95JWCB40t7ftbQoUtEUOa/VU+bQLUC/vcvVDirpBG5zBQNrvKdIH7vMWq6LhXE0hthyiw8+OmVzHU=
 notifications:
   email:
     recipients: jesse@ccs.neu.edu

@@ -1,7 +1,5 @@
-numgo
-=======
-
-[![Build Status](https://travis-ci.org/jesand/numgo.svg?branch=master)](https://travis-ci.org/jesand/numgo) [![Coverage Status](https://img.shields.io/coveralls/jesand/numgo.svg)](https://coveralls.io/r/jesand/numgo?branch=master)
+numgo [![Build Status](https://travis-ci.org/jesand/numgo.svg?branch=master)](https://travis-ci.org/jesand/numgo) [![Coverage Status](https://img.shields.io/coveralls/jesand/numgo.svg)](https://coveralls.io/r/jesand/numgo?branch=master)
+===============
 
 Linear algebraic tools for Go, based on the excellent NumPy library for Python.
 
@@ -15,6 +13,6 @@ features from NumPy and SciPy to build this into a more robust scientific
 computing framework. Any comments are welcome.
 
 Documentation
---------------
+---------------
 
 You can find API documentation at [godoc](https://godoc.org/github.com/jesand/numgo/matrix)

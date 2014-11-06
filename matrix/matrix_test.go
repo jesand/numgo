@@ -299,14 +299,14 @@ func TestSparseRandN(t *testing.T) {
 }
 
 func TestInverse(t *testing.T) {
-	Convey("Given an invertable square matrix", t, func() {
+	Convey("Given an invertible square matrix", t, func() {
 		m := A2(
 			[]float64{4, 7},
 			[]float64{2, 6},
 		).M()
 
 		Convey("When I take the inverse", func() {
-			mi, err := m.Inverse()
+			mi, err := Inverse(m)
 			So(err, ShouldBeNil)
 
 			Convey("The inverse is correct", func() {
@@ -325,6 +325,18 @@ func TestInverse(t *testing.T) {
 				So(i.Item(1, 0), ShouldEqual, 0)
 				So(i.Item(1, 1), ShouldBeBetween, 1-Eps, 1+Eps)
 			})
+		})
+	})
+
+	Convey("Given a non-invertible matrix", t, func() {
+		m := A([]int{2, 2},
+			0, 0,
+			1, 1).M()
+
+		Convey("Inverse returns an error", func() {
+			mi, err := Inverse(m)
+			So(mi, ShouldBeNil)
+			So(err, ShouldNotBeNil)
 		})
 	})
 }

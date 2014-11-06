@@ -461,8 +461,7 @@ func (array SparseCooF64Matrix) M() Matrix {
 
 // Return the same matrix, but with axes transposed. The same data is used,
 // for speed and memory efficiency. Use Copy() to create a new array.
-// A 1D array is unchanged; create a 2D analog to rotate a vector.
-func (array SparseCooF64Matrix) T() NDArray {
+func (array SparseCooF64Matrix) T() Matrix {
 	return &SparseCooF64Matrix{
 		shape:     []int{array.shape[1], array.shape[0]},
 		values:    array.values,
