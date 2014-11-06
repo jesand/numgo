@@ -2,11 +2,35 @@ package matrix
 
 import (
 	"fmt"
+	"sort"
 )
 
 type cooValue struct {
 	pos   [2]int
 	value float64
+}
+
+// ByPos is a sort.Interface which sorts matrix values by row, then column
+type ByPos []cooValue
+
+func (a ByPos) Len() int      { return len(a) }
+func (a ByPos) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByPos) Less(i, j int) bool {
+	return a[i].pos[0] < a[j].pos[0] ||
+		(a[i].pos[0] == a[j].pos[0] && a[i].pos[1] < a[j].pos[1])
+}
+
+// Search returns the index of the item with the given position, or -1 if
+// it wasn't found.
+func (a ByPos) Search(goal [2]int) int {
+	idx := sort.Search(len(a), func(i int) bool {
+		return a[i].pos[0] > goal[0] ||
+			(a[i].pos[0] == goal[0] && a[i].pos[1] >= goal[1])
+	})
+	if idx == len(a) || a[idx].pos != goal {
+		return -1
+	}
+	return idx
 }
 
 // A sparse 2D Matrix with coordinate representation: each entry is stored as a
@@ -216,14 +240,13 @@ func (array SparseCooF64Matrix) Item(index ...int) float64 {
 	if len(index) != 2 || index[0] >= array.shape[0] || index[1] >= array.shape[1] {
 		panic(fmt.Sprintf("Item indices %v invalid for array shape %v", index, array.shape))
 	}
+	goal := [2]int{index[0], index[1]}
 	if array.transpose {
-		index[0], index[1] = index[1], index[0]
+		goal[0], goal[1] = goal[1], goal[0]
 	}
-	// TODO(jesand): this linear search should be done much more quickly
-	for _, v := range array.values {
-		if v.pos[0] == index[0] && v.pos[1] == index[1] {
-			return v.value
-		}
+	idx := ByPos(array.values).Search(goal)
+	if idx >= 0 {
+		return array.values[idx].value
 	}
 	return 0
 }
@@ -282,21 +305,19 @@ func (array *SparseCooF64Matrix) ItemSub(value float64) NDArray {
 
 // Set an array element
 func (array *SparseCooF64Matrix) ItemSet(value float64, index ...int) {
+	goal := [2]int{index[0], index[1]}
 	if array.transpose {
-		index[0], index[1] = index[1], index[0]
+		goal[0], goal[1] = goal[1], goal[0]
 	}
-	// TODO(jesand): this linear search should be done much more quickly
-	for idx, v := range array.values {
-		if v.pos[0] == index[0] && v.pos[1] == index[1] {
-			array.values[idx].value = value
-			return
-		}
-	}
-	if value != 0 {
+	idx := ByPos(array.values).Search(goal)
+	if idx >= 0 {
+		array.values[idx].value = value
+	} else if value != 0 {
 		array.values = append(array.values, cooValue{
-			pos:   [2]int{index[0], index[1]},
+			pos:   goal,
 			value: value,
 		})
+		sort.Sort(ByPos(array.values))
 	}
 }
 
