@@ -209,6 +209,7 @@ func TestAll(t *testing.T) {
 	Convey("All returns false when all items are not set", t, func() {
 		So(All(SparseRand(4, 2, 0.25)), ShouldBeFalse)
 		So(All(A1(1, 0, 3)), ShouldBeFalse)
+		So(All(Diag(1, 2, 3)), ShouldBeFalse)
 	})
 	Convey("All returns false when no item is set", t, func() {
 		So(All(Zeros(4, 2)), ShouldBeFalse)

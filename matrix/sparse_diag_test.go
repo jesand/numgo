@@ -2,8 +2,399 @@ package matrix
 
 import (
 	. "github.com/smartystreets/goconvey/convey"
+	"math"
 	"testing"
 )
+
+func TestSparseDiagAddDivMulSub(t *testing.T) {
+	Convey("Given two sparse diag matrices", t, func() {
+		d1 := Diag(1, 2, 3, 4)
+		d2 := Diag(5, 6, 7, 8)
+
+		Convey("Add works", func() {
+			a := d1.Add(d2)
+			So(a.Shape(), ShouldResemble, []int{4, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				6, 0, 0, 0,
+				0, 8, 0, 0,
+				0, 0, 10, 0,
+				0, 0, 0, 12,
+			})
+		})
+
+		Convey("Div works", func() {
+			a := d2.Div(d1)
+			So(a.Shape(), ShouldResemble, []int{4, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				5, 0, 0, 0,
+				0, 3, 0, 0,
+				0, 0, 7. / 3, 0,
+				0, 0, 0, 2,
+			})
+		})
+
+		Convey("Prod works", func() {
+			a := d2.Prod(d1)
+			So(a.Shape(), ShouldResemble, []int{4, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				5, 0, 0, 0,
+				0, 12, 0, 0,
+				0, 0, 21, 0,
+				0, 0, 0, 32,
+			})
+		})
+
+		Convey("Sub works", func() {
+			a := d2.Sub(d1)
+			So(a.Shape(), ShouldResemble, []int{4, 4})
+			So(a.Array(), ShouldResemble, []float64{
+				4, 0, 0, 0,
+				0, 4, 0, 0,
+				0, 0, 4, 0,
+				0, 0, 0, 4,
+			})
+		})
+	})
+}
+
+func TestSparseDiagAllAny(t *testing.T) {
+	Convey("Given partial and empty arrays", t, func() {
+		partial := Diag(1, 2, 3)
+		empty := Diag(0, 0, 0)
+
+		Convey("All() is correct", func() {
+			So(partial.All(), ShouldBeFalse)
+			So(empty.All(), ShouldBeFalse)
+		})
+
+		Convey("Any() is correct", func() {
+			So(partial.Any(), ShouldBeTrue)
+			So(empty.Any(), ShouldBeFalse)
+		})
+	})
+
+	Convey("Given pos, neg, and mixed arrays", t, func() {
+		pos := Diag(1, 2, 3)
+		neg := Diag(-1, -2, -3)
+		mixed := Diag(1, -3, 3)
+		fge := func(v float64) bool { return v >= 0 }
+		fgt := func(v float64) bool { return v > 0 }
+		f2ge := func(v1, v2 float64) bool { return v1 >= v2 }
+		f2gt := func(v1, v2 float64) bool { return v1 > v2 }
+
+		Convey("AllF() is correct", func() {
+			So(pos.AllF(fge), ShouldBeTrue)
+			So(mixed.AllF(fge), ShouldBeFalse)
+			So(neg.AllF(fge), ShouldBeFalse)
+		})
+
+		Convey("AnyF() is correct", func() {
+			So(pos.AnyF(fgt), ShouldBeTrue)
+			So(mixed.AnyF(fgt), ShouldBeTrue)
+			So(neg.AnyF(fgt), ShouldBeFalse)
+		})
+
+		Convey("AllF2() is correct", func() {
+			So(pos.AllF2(f2ge, neg), ShouldBeTrue)
+			So(mixed.AllF2(f2ge, neg), ShouldBeFalse)
+			So(neg.AllF2(f2ge, neg), ShouldBeTrue)
+		})
+
+		Convey("AnyF2() is correct", func() {
+			So(pos.AnyF2(f2gt, neg), ShouldBeTrue)
+			So(mixed.AnyF2(f2gt, neg), ShouldBeTrue)
+			So(neg.AnyF2(f2gt, neg), ShouldBeFalse)
+		})
+	})
+}
+
+func TestSparseDiagApply(t *testing.T) {
+	Convey("Apply works", t, func() {
+		a := Diag(1, 2, 3)
+		a2 := a.Apply(func(v float64) float64 { return 2 * v })
+		So(a2.Shape(), ShouldResemble, []int{3, 3})
+		So(a2.Array(), ShouldResemble, []float64{
+			2, 0, 0,
+			0, 4, 0,
+			0, 0, 6,
+		})
+	})
+}
+
+func TestSparseDiagColColSetCols(t *testing.T) {
+	Convey("Given an array", t, func() {
+		a := Diag(1, 2, 3)
+
+		Convey("Cols is correct", func() {
+			So(a.Cols(), ShouldEqual, 3)
+		})
+
+		Convey("Col panics with invalid input", func() {
+			So(func() { a.Col(-1) }, ShouldPanic)
+			So(func() { a.Col(3) }, ShouldPanic)
+		})
+
+		Convey("Col works", func() {
+			So(a.Col(0), ShouldResemble, []float64{1, 0, 0})
+			So(a.Col(1), ShouldResemble, []float64{0, 2, 0})
+			So(a.Col(2), ShouldResemble, []float64{0, 0, 3})
+		})
+
+		Convey("ColSet panics", func() {
+			So(func() { a.ColSet(-1, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.ColSet(3, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.ColSet(0, []float64{0, 1}) }, ShouldPanic)
+			So(func() { a.ColSet(0, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.ColSet(0, []float64{0, 1, 2, 3}) }, ShouldPanic)
+		})
+	})
+}
+
+func TestSparseDiagDiag(t *testing.T) {
+	Convey("Given an array", t, func() {
+		a := Diag(1, 2, 3)
+
+		Convey("Diag() works", func() {
+			d := a.Diag()
+			So(d.Shape(), ShouldResemble, []int{3, 1})
+			So(d.Array(), ShouldResemble, []float64{1, 2, 3})
+		})
+
+		Convey("Transpose Diag() works", func() {
+			d := a.T().M().Diag()
+			So(d.Shape(), ShouldResemble, []int{3, 1})
+			So(d.Array(), ShouldResemble, []float64{1, 2, 3})
+		})
+	})
+}
+
+func TestSparseDiagInverseNormLDivide(t *testing.T) {
+	Convey("Given an invertible diagonal matrix", t, func() {
+		m := Diag(2, 3, 5)
+
+		Convey("When I take the inverse", func() {
+			mi, err := m.Inverse()
+			So(err, ShouldBeNil)
+
+			Convey("The inverse is correct", func() {
+				So(mi.Shape(), ShouldResemble, []int{3, 3})
+				So(mi.Array(), ShouldResemble, []float64{
+					.5, 0, 0,
+					0, 1. / 3, 0,
+					0, 0, .2,
+				})
+			})
+
+			Convey("The inverse gives us back I", func() {
+				i := m.MProd(mi)
+				So(i.Shape(), ShouldResemble, []int{3, 3})
+				So(i.Array(), ShouldResemble, []float64{
+					1, 0, 0,
+					0, 1, 0,
+					0, 0, 1,
+				})
+			})
+		})
+	})
+
+	Convey("Given a 3x3 matrix", t, func() {
+		m := Diag(2, 3, 5)
+
+		Convey("The 1-norm is correct", func() {
+			So(m.Norm(1), ShouldEqual, 5)
+		})
+
+		Convey("The 2-norm is correct", func() {
+			So(m.Norm(2), ShouldEqual, 5)
+		})
+
+		Convey("The inf-norm is correct", func() {
+			So(m.Norm(math.Inf(1)), ShouldEqual, 5)
+		})
+	})
+
+	Convey("Given a simple division problem", t, func() {
+		a := Diag(4, 6, 8)
+		b := Diag(2, 2, 2)
+
+		Convey("When I solve the system", func() {
+			x := a.LDivide(b)
+
+			Convey("I get the correct solution", func() {
+				So(x.Shape(), ShouldResemble, []int{3, 3})
+				So(x.Array(), ShouldResemble, []float64{
+					.5, 0, 0,
+					0, 1. / 3, 0,
+					0, 0, .25,
+				})
+			})
+
+			Convey("The product ax = b is true", func() {
+				b2 := a.MProd(x)
+				So(b2.Shape(), ShouldResemble, []int{3, 3})
+				So(b2.Equal(b), ShouldBeTrue)
+			})
+		})
+	})
+}
+
+func TestSparseDiagItemMath(t *testing.T) {
+	Convey("Given a diag array", t, func() {
+		a := Diag(1, 2, 3)
+
+		Convey("When I call ItemAdd", func() {
+			a2 := a.ItemAdd(1)
+			Convey("The result is correct", func() {
+				So(a2.Array(), ShouldResemble, []float64{
+					2, 1, 1,
+					1, 3, 1,
+					1, 1, 4,
+				})
+			})
+		})
+
+		Convey("When I call ItemDiv", func() {
+			a2 := a.ItemDiv(2)
+			Convey("The result is correct", func() {
+				So(a2.Array(), ShouldResemble, []float64{
+					.5, 0, 0,
+					0, 1, 0,
+					0, 0, 1.5,
+				})
+			})
+		})
+
+		Convey("When I call ItemProd", func() {
+			a2 := a.ItemProd(2)
+			Convey("The result is correct", func() {
+				So(a2.Array(), ShouldResemble, []float64{
+					2, 0, 0,
+					0, 4, 0,
+					0, 0, 6,
+				})
+			})
+		})
+
+		Convey("When I call ItemSub", func() {
+			a2 := a.ItemSub(1)
+			Convey("The result is correct", func() {
+				So(a2.Array(), ShouldResemble, []float64{
+					0, -1, -1,
+					-1, 1, -1,
+					-1, -1, 2,
+				})
+			})
+		})
+	})
+}
+
+func TestSparseDiagIters(t *testing.T) {
+	Convey("Given a diag array", t, func() {
+		a := Diag(1, 2, 3)
+
+		Convey("FlatIter goes through the array in order", func() {
+			it := a.FlatIter()
+			for next := 0; next < 3; next++ {
+				So(it.HasNext(), ShouldBeTrue)
+				v, idx := it.FlatNext()
+				So(idx, ShouldEqual, next*4)
+				So(v, ShouldEqual, next+1)
+				So(a.FlatItem(idx), ShouldEqual, next+1)
+			}
+			So(it.HasNext(), ShouldBeFalse)
+			v, idx := it.FlatNext()
+			So(v, ShouldEqual, 0)
+			So(idx, ShouldEqual, 0)
+		})
+
+		Convey("Iter goes through the array in order", func() {
+			it := a.Iter()
+			for row := 0; row < 3; row++ {
+				So(it.HasNext(), ShouldBeTrue)
+				v, idx := it.Next()
+				So(idx, ShouldResemble, []int{row, row})
+				So(v, ShouldEqual, row+1)
+				So(a.Item(idx...), ShouldEqual, row+1)
+			}
+			So(it.HasNext(), ShouldBeFalse)
+			v, idx := it.Next()
+			So(v, ShouldEqual, 0)
+			So(idx, ShouldBeNil)
+		})
+
+		Convey("T().FlatIter goes through the array in order", func() {
+			tr := a.T()
+			it := tr.FlatIter()
+			for next := 0; next < 3; next++ {
+				So(it.HasNext(), ShouldBeTrue)
+				v, idx := it.FlatNext()
+				So(idx, ShouldEqual, next*4)
+				So(v, ShouldEqual, next+1)
+				So(a.FlatItem(idx), ShouldEqual, next+1)
+			}
+			So(it.HasNext(), ShouldBeFalse)
+		})
+
+		Convey("T().Iter() goes through the array in order", func() {
+			tr := a.T()
+			it := tr.Iter()
+			for row := 0; row < 3; row++ {
+				So(it.HasNext(), ShouldBeTrue)
+				v, idx := it.Next()
+				So(idx, ShouldResemble, []int{row, row})
+				So(v, ShouldEqual, row+1)
+				So(a.Item(idx...), ShouldEqual, row+1)
+			}
+			So(it.HasNext(), ShouldBeFalse)
+		})
+	})
+}
+
+func TestSparseDiagMaxMin(t *testing.T) {
+	Convey("Given positive and negative diagonal arrays", t, func() {
+		pos := Diag(1, 2, 3)
+		neg := Diag(-1, -2, -3)
+
+		Convey("Max is right", func() {
+			So(pos.Max(), ShouldEqual, 3)
+			So(neg.Max(), ShouldEqual, 0)
+		})
+
+		Convey("Min is right", func() {
+			So(pos.Min(), ShouldEqual, 0)
+			So(neg.Min(), ShouldEqual, -3)
+		})
+	})
+}
+
+func TestSparseDiagRowRowSetRows(t *testing.T) {
+	Convey("Given an array", t, func() {
+		a := Diag(1, 2, 3)
+
+		Convey("Rows is correct", func() {
+			So(a.Rows(), ShouldEqual, 3)
+		})
+
+		Convey("Row panics with invalid input", func() {
+			So(func() { a.Row(-1) }, ShouldPanic)
+			So(func() { a.Row(3) }, ShouldPanic)
+		})
+
+		Convey("Row works", func() {
+			So(a.Row(0), ShouldResemble, []float64{1, 0, 0})
+			So(a.Row(1), ShouldResemble, []float64{0, 2, 0})
+			So(a.Row(2), ShouldResemble, []float64{0, 0, 3})
+		})
+
+		Convey("RowSet panics", func() {
+			So(func() { a.RowSet(-1, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(3, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1, 2, 3}) }, ShouldPanic)
+		})
+	})
+}
 
 func TestSparseDiagMatrix(t *testing.T) {
 	Convey("Given a sparse matrix with shape 5, 3", t, func() {
@@ -15,6 +406,10 @@ func TestSparseDiagMatrix(t *testing.T) {
 
 		Convey("Any is false", func() {
 			So(array.Any(), ShouldBeFalse)
+		})
+
+		Convey("CountNonzero is correct", func() {
+			So(array.CountNonzero(), ShouldEqual, 0)
 		})
 
 		Convey("Size is 15", func() {
@@ -29,7 +424,21 @@ func TestSparseDiagMatrix(t *testing.T) {
 			So(array.Shape(), ShouldResemble, []int{5, 3})
 		})
 
-		Convey("Item() returns all zeros", func() {
+		Convey("Item() panics given invalid input", func() {
+			So(func() { array.Item(0) }, ShouldPanic)
+			So(func() { array.Item(0, 0, 0) }, ShouldPanic)
+			So(func() { array.Item(5, 0) }, ShouldPanic)
+			So(func() { array.Item(0, 3) }, ShouldPanic)
+		})
+
+		Convey("ItemSet() panics given invalid input", func() {
+			So(func() { array.ItemSet(1.0, 0) }, ShouldPanic)
+			So(func() { array.ItemSet(1.0, 0, 0, 0) }, ShouldPanic)
+			So(func() { array.ItemSet(1.0, 5, 0) }, ShouldPanic)
+			So(func() { array.ItemSet(1.0, 0, 3) }, ShouldPanic)
+		})
+
+		Convey("Item() returns the right values", func() {
 			for i0 := 0; i0 < 5; i0++ {
 				for i1 := 0; i1 < 3; i1++ {
 					So(array.Item(i0, i1), ShouldEqual, 0)
@@ -66,6 +475,35 @@ func TestSparseDiagMatrix(t *testing.T) {
 
 			Convey("Any is true", func() {
 				So(array.Any(), ShouldBeTrue)
+			})
+
+			Convey("Ravel is correct", func() {
+				r := array.Ravel()
+				So(r.Shape(), ShouldResemble, []int{15})
+				So(r.Array(), ShouldResemble, []float64{
+					0, 0, 0,
+					0, 1, 0,
+					0, 0, 2,
+					0, 0, 0,
+					0, 0, 0,
+				})
+			})
+
+			Convey("Slice works", func() {
+				r := array.Slice([]int{1, 1}, []int{3, 3})
+				So(r.Shape(), ShouldResemble, []int{2, 2})
+				So(r.Array(), ShouldResemble, []float64{
+					1, 0,
+					0, 2,
+				})
+			})
+
+			Convey("CountNonzero is correct", func() {
+				So(array.CountNonzero(), ShouldEqual, 2)
+			})
+
+			Convey("Equal is correct", func() {
+				So(array.Equal(SparseDiag(5, 3, 0, 1, 2)), ShouldBeTrue)
 			})
 
 			Convey("Item() returns updates", func() {

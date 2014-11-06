@@ -280,9 +280,6 @@ func (array *SparseDiagF64Matrix) Iter() CoordNDArrayIterator {
 
 // Solve for x, where ax = b.
 func (array SparseDiagF64Matrix) LDivide(b Matrix) Matrix {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't LDivide a %d-dim array", len(array.shape)))
-	}
 	return LDivide(&array, b)
 }
 

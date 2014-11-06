@@ -64,10 +64,8 @@ func (array SparseCooF64Matrix) Array() []float64 {
 }
 
 // Set the values of the items on a given column
-func (array SparseCooF64Matrix) ColSet(col int, values []float64) {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't ColSet a %d-dim array", len(array.shape)))
-	} else if col < 0 || col >= array.shape[1] {
+func (array *SparseCooF64Matrix) ColSet(col int, values []float64) {
+	if col < 0 || col >= array.shape[1] {
 		panic(fmt.Sprintf("ColSet can't set col %d of a %d-col array", col, array.shape[1]))
 	} else if len(values) != array.shape[0] {
 		panic(fmt.Sprintf("ColSet has %d rows but got %d values", array.shape[0], len(values)))
@@ -79,9 +77,7 @@ func (array SparseCooF64Matrix) ColSet(col int, values []float64) {
 
 // Get a particular column for read-only access. May or may not be a copy.
 func (array SparseCooF64Matrix) Col(col int) []float64 {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't get columns for a %d-dim array", len(array.shape)))
-	} else if col < 0 || col >= array.shape[1] {
+	if col < 0 || col >= array.shape[1] {
 		panic(fmt.Sprintf("Can't get column %d from a %dx%d array", col, array.shape[0], array.shape[1]))
 	}
 	result := make([]float64, array.shape[1])
@@ -116,8 +112,8 @@ func (array SparseCooF64Matrix) copy() *SparseCooF64Matrix {
 		shape:  make([]int, len(array.shape)),
 		values: make([]cooValue, len(array.values)),
 	}
+	copy(result.shape[:], array.shape[:])
 	if array.transpose {
-		result.shape[0], result.shape[1] = array.shape[1], array.shape[0]
 		for i, v := range array.values {
 			result.values[i] = cooValue{
 				pos:   [2]int{v.pos[1], v.pos[0]},
@@ -125,7 +121,6 @@ func (array SparseCooF64Matrix) copy() *SparseCooF64Matrix {
 			}
 		}
 	} else {
-		copy(result.shape[:], array.shape[:])
 		copy(result.values[:], array.values[:])
 	}
 	return result
@@ -145,11 +140,7 @@ func (array SparseCooF64Matrix) CountNonzero() int {
 // Returns a dense copy of the array
 func (array SparseCooF64Matrix) Dense() NDArray {
 	var result NDArray
-	if array.transpose {
-		result = Dense(array.shape[1], array.shape[0])
-	} else {
-		result = Dense(array.shape[0], array.shape[1])
-	}
+	result = Dense(array.shape...)
 	for _, val := range array.values {
 		if array.transpose {
 			result.ItemSet(val.value, val.pos[1], val.pos[0])
@@ -162,9 +153,6 @@ func (array SparseCooF64Matrix) Dense() NDArray {
 
 // Get a column vector containing the main diagonal elements of the matrix
 func (array SparseCooF64Matrix) Diag() Matrix {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't take diag of a %d-dim array", len(array.shape)))
-	}
 	size := array.shape[0]
 	if array.shape[1] < size {
 		size = array.shape[1]
@@ -205,7 +193,7 @@ func (array SparseCooF64Matrix) FlatItem(index int) float64 {
 func (array *SparseCooF64Matrix) FlatItemSet(value float64, index int) {
 	nd := flatToNd(array.shape, index)
 	if array.transpose {
-		array.ItemSet(value, nd[1], nd[0])
+		array.ItemSet(value, nd[0], nd[1])
 	}
 	array.ItemSet(value, nd[0], nd[1])
 }
@@ -242,11 +230,7 @@ func (array SparseCooF64Matrix) Item(index ...int) float64 {
 
 // Add a scalar value to each array element
 func (array *SparseCooF64Matrix) ItemAdd(value float64) NDArray {
-	sh := []int{array.shape[0], array.shape[1]}
-	if array.transpose {
-		sh[0], sh[1] = sh[1], sh[0]
-	}
-	result := WithValue(value, sh...)
+	result := WithValue(value, array.shape...)
 	for _, v := range array.values {
 		if array.transpose {
 			result.ItemSet(v.value+value, v.pos[1], v.pos[0])
@@ -259,11 +243,7 @@ func (array *SparseCooF64Matrix) ItemAdd(value float64) NDArray {
 
 // Divide each array element by a scalar value
 func (array *SparseCooF64Matrix) ItemDiv(value float64) NDArray {
-	sh := []int{array.shape[0], array.shape[1]}
-	if array.transpose {
-		sh[0], sh[1] = sh[1], sh[0]
-	}
-	result := Dense(sh...)
+	result := Dense(array.shape...)
 	for _, v := range array.values {
 		if array.transpose {
 			result.ItemSet(v.value/value, v.pos[1], v.pos[0])
@@ -276,11 +256,7 @@ func (array *SparseCooF64Matrix) ItemDiv(value float64) NDArray {
 
 // Multiply each array element by a scalar value
 func (array *SparseCooF64Matrix) ItemProd(value float64) NDArray {
-	sh := []int{array.shape[0], array.shape[1]}
-	if array.transpose {
-		sh[0], sh[1] = sh[1], sh[0]
-	}
-	result := Dense(sh...)
+	result := Dense(array.shape...)
 	for _, v := range array.values {
 		if array.transpose {
 			result.ItemSet(v.value*value, v.pos[1], v.pos[0])
@@ -293,11 +269,7 @@ func (array *SparseCooF64Matrix) ItemProd(value float64) NDArray {
 
 // Subtract a scalar value from each array element
 func (array *SparseCooF64Matrix) ItemSub(value float64) NDArray {
-	sh := []int{array.shape[0], array.shape[1]}
-	if array.transpose {
-		sh[0], sh[1] = sh[1], sh[0]
-	}
-	result := WithValue(-value, sh...)
+	result := WithValue(-value, array.shape...)
 	for _, v := range array.values {
 		if array.transpose {
 			result.ItemSet(v.value-value, v.pos[1], v.pos[0])
@@ -386,10 +358,8 @@ func (array SparseCooF64Matrix) Ravel() NDArray {
 }
 
 // Set the values of the items on a given row
-func (array SparseCooF64Matrix) RowSet(row int, values []float64) {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't RowSet a %d-dim array", len(array.shape)))
-	} else if row < 0 || row >= array.shape[0] {
+func (array *SparseCooF64Matrix) RowSet(row int, values []float64) {
+	if row < 0 || row >= array.shape[0] {
 		panic(fmt.Sprintf("RowSet can't set row %d of a %d-row array", row, array.shape[0]))
 	} else if len(values) != array.shape[1] {
 		panic(fmt.Sprintf("RowSet has %d columns but got %d values", array.shape[1], len(values)))
@@ -401,9 +371,7 @@ func (array SparseCooF64Matrix) RowSet(row int, values []float64) {
 
 // Get a particular row for read-only access. May or may not be a copy.
 func (array SparseCooF64Matrix) Row(row int) []float64 {
-	if len(array.shape) != 2 {
-		panic(fmt.Sprintf("Can't get rows for a %d-dim array", len(array.shape)))
-	} else if row < 0 || row >= array.shape[0] {
+	if row < 0 || row >= array.shape[0] {
 		panic(fmt.Sprintf("Can't get row %d from a %dx%d array", row, array.shape[0], array.shape[1]))
 	}
 	result := make([]float64, array.shape[0])
@@ -487,6 +455,9 @@ func (iter *sparseCooIterator) Next() (float64, []int) {
 	}
 	pos := iter.valuePos
 	iter.valuePos++
+	if iter.array.transpose {
+		return iter.array.values[pos].value, []int{iter.array.values[pos].pos[1], iter.array.values[pos].pos[0]}
+	}
 	return iter.array.values[pos].value, iter.array.values[pos].pos[:]
 }
 
@@ -497,5 +468,8 @@ func (iter *sparseCooIterator) FlatNext() (float64, int) {
 	}
 	pos := iter.valuePos
 	iter.valuePos++
+	if iter.array.transpose {
+		return iter.array.values[pos].value, ndToFlat(iter.array.shape, []int{iter.array.values[pos].pos[1], iter.array.values[pos].pos[0]})
+	}
 	return iter.array.values[pos].value, ndToFlat(iter.array.shape, iter.array.values[pos].pos[:])
 }
