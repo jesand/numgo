@@ -15,4 +15,5 @@ computing framework. Any comments are welcome.
 Documentation
 ---------------
 
-You can find API documentation at [godoc](https://godoc.org/github.com/jesand/numgo/matrix)
+You can find API documentation at
+[godoc](https://godoc.org/github.com/jesand/numgo).
