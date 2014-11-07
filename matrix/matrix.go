@@ -83,7 +83,7 @@ func M(shape []int, array ...float64) Matrix {
 // Create a sparse matrix of the specified dimensionality. This matrix will be
 // stored in coordinate format: each entry is stored as a (x, y, value) triple.
 func SparseCoo(rows, cols int) Matrix {
-	return &SparseCooF64Matrix{
+	return &sparseCooF64Matrix{
 		shape:  []int{rows, cols},
 		values: make(map[[2]int]float64),
 	}
@@ -101,7 +101,7 @@ func SparseDiag(rows, cols int, diag ...float64) Matrix {
 	if cols < rows {
 		size = cols
 	}
-	array := &SparseDiagF64Matrix{
+	array := &sparseDiagF64Matrix{
 		shape: []int{rows, cols},
 		diag:  make([]float64, size),
 	}
@@ -175,7 +175,7 @@ func toMat64(m Matrix) *mat64.Dense {
 // Convert mat64's matrix type to our matrix type
 func toMatrix(m mat64.Matrix) Matrix {
 	rows, cols := m.Dims()
-	array := &DenseF64Array{
+	array := &denseF64Array{
 		shape: []int{rows, cols},
 		array: make([]float64, rows*cols),
 	}

@@ -251,7 +251,7 @@ func A(shape []int, values ...float64) NDArray {
 	if len(values) != size {
 		panic(fmt.Sprintf("Expected %d array elements but got %d", size, len(values)))
 	}
-	array := &DenseF64Array{
+	array := &denseF64Array{
 		shape: shape,
 		array: make([]float64, len(values)),
 	}
@@ -266,7 +266,7 @@ func A1(values ...float64) NDArray {
 
 // Create a 2D array
 func A2(rows ...[]float64) NDArray {
-	array := &DenseF64Array{
+	array := &denseF64Array{
 		shape: []int{len(rows), len(rows[0])},
 		array: make([]float64, len(rows)*len(rows[0])),
 	}
@@ -287,7 +287,7 @@ func Dense(size ...int) NDArray {
 	for _, sz := range size {
 		totalSize *= sz
 	}
-	return &DenseF64Array{
+	return &denseF64Array{
 		shape: size,
 		array: make([]float64, totalSize),
 	}
