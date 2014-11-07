@@ -177,14 +177,6 @@ func (array SparseDiagF64Matrix) FlatItemSet(value float64, index int) {
 	array.diag[coord[0]] = value
 }
 
-// Return an iterator over populated matrix entries
-func (array *SparseDiagF64Matrix) FlatIter() FlatNDArrayIterator {
-	return &sparseDiagIterator{
-		array:   array,
-		diagPos: 0,
-	}
-}
-
 // Get the matrix inverse
 func (array SparseDiagF64Matrix) Inverse() (Matrix, error) {
 	return Inverse(&array)
@@ -268,14 +260,6 @@ func (array SparseDiagF64Matrix) ItemSet(value float64, index ...int) {
 		panic(fmt.Sprintf("ItemSet indices %v invalid for sparse diagonal array", index))
 	}
 	array.diag[index[0]] = value
-}
-
-// Return an iterator over populated matrix entries
-func (array *SparseDiagF64Matrix) Iter() CoordNDArrayIterator {
-	return &sparseDiagIterator{
-		array:   array,
-		diagPos: 0,
-	}
 }
 
 // Solve for x, where ax = b.
@@ -401,36 +385,40 @@ func (array SparseDiagF64Matrix) M() Matrix {
 // Return the same matrix, but with axes transposed. The same data is used,
 // for speed and memory efficiency. Use Copy() to create a new array.
 func (array SparseDiagF64Matrix) T() Matrix {
-	return &array
-}
-
-// Iterates over all array elements
-type sparseDiagIterator struct {
-	array   *SparseDiagF64Matrix
-	diagPos int
-}
-
-// Ask whether there are more values to iterate over.
-func (iter sparseDiagIterator) HasNext() bool {
-	return iter.diagPos < len(iter.array.diag)
-}
-
-// Return the value and coordinates of the next entry
-func (iter *sparseDiagIterator) Next() (float64, []int) {
-	if iter.diagPos >= len(iter.array.diag) {
-		return 0, nil
+	return &SparseDiagF64Matrix{
+		shape: []int{array.shape[1], array.shape[0]},
+		diag:  array.diag,
 	}
-	pos := iter.diagPos
-	iter.diagPos++
-	return iter.array.diag[pos], []int{pos, pos}
 }
 
-// Return the value and flat index of the next entry
-func (iter *sparseDiagIterator) FlatNext() (float64, int) {
-	if iter.diagPos >= len(iter.array.diag) {
-		return 0, 0
+// Visit all matrix elements, invoking a method on each. If the method
+// returns false, iteration is aborted and VisitNonzero() returns false.
+// Otherwise, it returns true.
+func (array SparseDiagF64Matrix) Visit(f func(pos []int, value float64) bool) bool {
+	for row := 0; row < array.shape[0]; row++ {
+		for col := 0; col < array.shape[1]; col++ {
+			var value float64
+			if row == col {
+				value = array.diag[row]
+			} else {
+				value = 0
+			}
+			if !f([]int{row, col}, value) {
+				return false
+			}
+		}
 	}
-	pos := iter.diagPos
-	iter.diagPos++
-	return iter.array.diag[pos], ndToFlat(iter.array.shape, []int{pos, pos})
+	return true
+}
+
+// Visit just nonzero elements, invoking a method on each. If the method
+// returns false, iteration is aborted and VisitNonzero() returns false.
+// Otherwise, it returns true.
+func (array SparseDiagF64Matrix) VisitNonzero(f func(pos []int, value float64) bool) bool {
+	for idx, value := range array.diag {
+		if !f([]int{idx, idx}, value) {
+			return false
+		}
+	}
+	return true
 }

@@ -75,7 +75,6 @@ func Add(array NDArray, others ...NDArray) NDArray {
 		}
 	}
 
-	size := array.Size()
 	switch sp {
 	case array.Sparsity():
 		result = array.Copy()
@@ -83,24 +82,16 @@ func Add(array NDArray, others ...NDArray) NDArray {
 		result = array.Dense()
 	case SparseCooMatrix:
 		result = SparseCoo(sh[0], sh[1])
-		for it := array.Iter(); it.HasNext(); {
-			v, idx := it.Next()
-			result.ItemSet(v, idx...)
-		}
+		array.VisitNonzero(func(pos []int, value float64) bool {
+			result.ItemSet(value, pos...)
+			return true
+		})
 	}
 	for _, o := range others {
-		switch o.Sparsity() {
-		case DenseArray:
-			for idx := 0; idx < size; idx++ {
-				result.FlatItemSet(result.FlatItem(idx)+o.FlatItem(idx), idx)
-			}
-
-		case SparseCooMatrix, SparseDiagMatrix:
-			for it := o.Iter(); it.HasNext(); {
-				v, idx := it.Next()
-				result.ItemSet(result.Item(idx...)+v, idx...)
-			}
-		}
+		o.VisitNonzero(func(pos []int, value float64) bool {
+			result.ItemSet(result.Item(pos...)+value, pos...)
+			return true
+		})
 	}
 	return result
 }
@@ -117,24 +108,16 @@ func All(array NDArray) bool {
 
 // Returns true if f is true for all array elements
 func AllF(array NDArray, f func(v float64) bool) bool {
-	switch array.Sparsity() {
-	case DenseArray:
-		for it := array.FlatIter(); it.HasNext(); {
-			if v, _ := it.FlatNext(); !f(v) {
-				return false
-			}
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		counted := 0
-		for it := array.Iter(); it.HasNext(); {
-			counted++
-			if v, _ := it.Next(); !f(v) {
-				return false
-			}
-		}
-		if counted < array.Size() && !f(0) {
+	counted := 0
+	all := array.VisitNonzero(func(pos []int, value float64) bool {
+		counted++
+		if !f(value) {
 			return false
 		}
+		return true
+	})
+	if !all || (counted < array.Size() && !f(0)) {
+		return false
 	}
 	return true
 }
@@ -162,30 +145,23 @@ func AllF2(array NDArray, f func(v1, v2 float64) bool, other NDArray) bool {
 
 // Returns true if and only if any item is nonzero
 func Any(array NDArray) bool {
-	switch array.Sparsity() {
-	default:
-		for it := array.FlatIter(); it.HasNext(); {
-			if v, _ := it.FlatNext(); v != 0 {
-				return true
-			}
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		for it := array.Iter(); it.HasNext(); {
-			if v, _ := it.Next(); v != 0 {
-				return true
-			}
-		}
-	}
-	return false
+	return !array.VisitNonzero(func(pos []int, value float64) bool {
+		return false
+	})
 }
 
 // Returns true if f is true for any array element
 func AnyF(array NDArray, f func(v float64) bool) bool {
-	size := array.Size()
-	for i := 0; i < size; i++ {
-		if f(array.FlatItem(i)) {
-			return true
+	counted := 0
+	allFalse := array.VisitNonzero(func(pos []int, value float64) bool {
+		counted++
+		if f(value) {
+			return false
 		}
+		return true
+	})
+	if !allFalse || (counted < array.Size() && f(0)) {
+		return true
 	}
 	return false
 }
@@ -317,25 +293,11 @@ func Div(array NDArray, others ...NDArray) NDArray {
 	}
 
 	result := array.Copy()
-	switch result.Sparsity() {
-	default:
-		for _, o := range others {
-			for it := result.FlatIter(); it.HasNext(); {
-				v, idx := it.FlatNext()
-				if v != 0 {
-					result.FlatItemSet(v/o.FlatItem(idx), idx)
-				}
-			}
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		for _, o := range others {
-			for it := result.Iter(); it.HasNext(); {
-				v, idx := it.Next()
-				if v != 0 {
-					result.ItemSet(v/o.Item(idx...), idx...)
-				}
-			}
-		}
+	for _, o := range others {
+		result.VisitNonzero(func(pos []int, value float64) bool {
+			result.ItemSet(value/o.Item(pos...), pos...)
+			return true
+		})
 	}
 	return result
 }
@@ -392,18 +354,10 @@ func ItemDiv(array NDArray, value float64) NDArray {
 		return array.Copy()
 	}
 	result := array.Copy()
-	switch result.Sparsity() {
-	default:
-		size := result.Size()
-		for idx := 0; idx < size; idx++ {
-			result.FlatItemSet(result.FlatItem(idx)/value, idx)
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		for it := result.Iter(); it.HasNext(); {
-			v, idx := it.Next()
-			result.ItemSet(v/value, idx...)
-		}
-	}
+	result.VisitNonzero(func(pos []int, v float64) bool {
+		result.ItemSet(v/value, pos...)
+		return true
+	})
 	return result
 }
 
@@ -413,18 +367,10 @@ func ItemProd(array NDArray, value float64) NDArray {
 		return array.Copy()
 	}
 	result := array.Copy()
-	switch result.Sparsity() {
-	default:
-		size := result.Size()
-		for idx := 0; idx < size; idx++ {
-			result.FlatItemSet(result.FlatItem(idx)*value, idx)
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		for it := result.Iter(); it.HasNext(); {
-			v, idx := it.Next()
-			result.ItemSet(v*value, idx...)
-		}
-	}
+	result.VisitNonzero(func(pos []int, v float64) bool {
+		result.ItemSet(v*value, pos...)
+		return true
+	})
 	return result
 }
 
@@ -474,17 +420,12 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 				}
 				result = Diag(resDiag...)
 			case SparseCooMatrix:
-				resArr := make([]float64, leftSh[0]*rightSh[1])
-				for it := right.Iter(); it.HasNext(); {
-					v, idx := it.Next()
-					resArr[idx[0]*rightSh[1]+idx[1]] += lDiag[idx[0]] * v
-				}
 				result = SparseCoo(leftSh[0], rightSh[1])
-				for idx, v := range resArr {
-					if v != 0 {
-						result.FlatItemSet(v, idx)
-					}
-				}
+				spRes := result.(*SparseCooF64Matrix)
+				right.VisitNonzero(func(pos []int, value float64) bool {
+					spRes.values[[2]int{pos[0], pos[1]}] += lDiag[pos[0]] * value
+					return true
+				})
 			default:
 				result = Dense(leftSh[0], rightSh[1]).M()
 				resArr := result.Array()
@@ -497,29 +438,24 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 			}
 
 		} else if leftSp == SparseCooMatrix && rightSp == SparseCooMatrix {
-			resArr := make([]float64, leftSh[0]*rightSh[1])
-			rArr := right.Array()
-			for it := left.Iter(); it.HasNext(); {
-				v, idx := it.Next()
-				for j := 0; j < rightSh[1]; j++ {
-					resArr[idx[0]*rightSh[1]+j] += v * rArr[idx[1]*rightSh[1]+j]
-				}
-			}
 			result = SparseCoo(leftSh[0], rightSh[1])
-			for idx, v := range resArr {
-				if v != 0 {
-					result.FlatItemSet(v, idx)
+			spRes := result.(*SparseCooF64Matrix)
+			rArr := right.Array()
+			left.VisitNonzero(func(pos []int, value float64) bool {
+				for j := 0; j < rightSh[1]; j++ {
+					spRes.values[[2]int{pos[0], j}] += value * rArr[pos[1]*rightSh[1]+j]
 				}
-			}
+				return true
+			})
 
 		} else if rightSp == SparseDiagMatrix {
 			rDiag := right.Diag().Array()
 			if leftSp == SparseCooMatrix {
 				resArr := make([]float64, leftSh[0]*rightSh[1])
-				for it := left.Iter(); it.HasNext(); {
-					v, idx := it.Next()
-					resArr[idx[0]*rightSh[1]+idx[1]] += v * rDiag[idx[1]]
-				}
+				left.VisitNonzero(func(pos []int, value float64) bool {
+					resArr[pos[0]*rightSh[1]+pos[1]] += value * rDiag[pos[1]]
+					return true
+				})
 				result = SparseCoo(leftSh[0], rightSh[1])
 				for idx, v := range resArr {
 					if v != 0 {
@@ -563,26 +499,16 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 // Get the value of the largest array element
 func Max(array NDArray) float64 {
 	max := math.Inf(-1)
-	switch array.Sparsity() {
-	default:
-		size := array.Size()
-		for idx := 0; idx < size; idx++ {
-			v := array.FlatItem(idx)
-			if v > max {
-				max = v
-			}
+	counted := 0
+	array.VisitNonzero(func(pos []int, value float64) bool {
+		counted++
+		if value > max {
+			max = value
 		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		counted := 0
-		for it := array.Iter(); it.HasNext(); {
-			if v, _ := it.Next(); v > max {
-				max = v
-			}
-			counted++
-		}
-		if max < 0 && counted < array.Size() {
-			max = 0
-		}
+		return true
+	})
+	if max < 0 && counted < array.Size() {
+		max = 0
 	}
 	return max
 }
@@ -590,26 +516,16 @@ func Max(array NDArray) float64 {
 // Get the value of the smallest array element
 func Min(array NDArray) float64 {
 	min := math.Inf(+1)
-	switch array.Sparsity() {
-	default:
-		size := array.Size()
-		for idx := 0; idx < size; idx++ {
-			v := array.FlatItem(idx)
-			if v < min {
-				min = v
-			}
+	counted := 0
+	array.VisitNonzero(func(pos []int, value float64) bool {
+		counted++
+		if value < min {
+			min = value
 		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		counted := 0
-		for it := array.Iter(); it.HasNext(); {
-			if v, _ := it.Next(); v < min {
-				min = v
-			}
-			counted++
-		}
-		if min > 0 && counted < array.Size() {
-			min = 0
-		}
+		return true
+	})
+	if min > 0 && counted < array.Size() {
+		min = 0
 	}
 	return min
 }
@@ -640,21 +556,11 @@ func Prod(array NDArray, others ...NDArray) NDArray {
 	}
 
 	result := array.Copy()
-	switch result.Sparsity() {
-	case DenseArray:
-		for _, o := range others {
-			for it := result.FlatIter(); it.HasNext(); {
-				v, idx := it.FlatNext()
-				result.FlatItemSet(v*o.FlatItem(idx), idx)
-			}
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		for _, o := range others {
-			for it := result.Iter(); it.HasNext(); {
-				v, idx := it.Next()
-				result.ItemSet(v*o.Item(idx...), idx...)
-			}
-		}
+	for _, o := range others {
+		result.VisitNonzero(func(pos []int, value float64) bool {
+			result.ItemSet(value*o.Item(pos...), pos...)
+			return true
+		})
 	}
 	return result
 }
@@ -662,10 +568,11 @@ func Prod(array NDArray, others ...NDArray) NDArray {
 // Get a 1D copy of the array, in 'C' order: rightmost axes change fastest
 func Ravel(array NDArray) NDArray {
 	result := Dense(array.Size())
-	for it := array.FlatIter(); it.HasNext(); {
-		v, idx := it.FlatNext()
-		result.FlatItemSet(v, idx)
-	}
+	shape := array.Shape()
+	array.VisitNonzero(func(pos []int, value float64) bool {
+		result.ItemSet(value, ndToFlat(shape, pos))
+		return true
+	})
 	return result
 }
 
@@ -754,7 +661,6 @@ func Sub(array NDArray, others ...NDArray) NDArray {
 		}
 	}
 
-	size := array.Size()
 	switch sp {
 	case array.Sparsity():
 		result = array.Copy()
@@ -762,24 +668,16 @@ func Sub(array NDArray, others ...NDArray) NDArray {
 		result = array.Dense()
 	case SparseCooMatrix:
 		result = SparseCoo(sh[0], sh[1])
-		for it := array.Iter(); it.HasNext(); {
-			v, idx := it.Next()
-			result.ItemSet(v, idx...)
-		}
+		array.VisitNonzero(func(pos []int, value float64) bool {
+			result.ItemSet(value, pos...)
+			return true
+		})
 	}
 	for _, o := range others {
-		switch o.Sparsity() {
-		case DenseArray:
-			for idx := 0; idx < size; idx++ {
-				result.FlatItemSet(result.FlatItem(idx)-o.FlatItem(idx), idx)
-			}
-
-		case SparseCooMatrix, SparseDiagMatrix:
-			for it := o.Iter(); it.HasNext(); {
-				v, idx := it.Next()
-				result.ItemSet(result.Item(idx...)-v, idx...)
-			}
-		}
+		o.VisitNonzero(func(pos []int, value float64) bool {
+			result.ItemSet(result.Item(pos...)-value, pos...)
+			return true
+		})
 	}
 	return result
 }
@@ -787,17 +685,9 @@ func Sub(array NDArray, others ...NDArray) NDArray {
 // Return the sum of all array elements
 func Sum(array NDArray) float64 {
 	var result float64
-	switch array.Sparsity() {
-	default:
-		for it := array.FlatIter(); it.HasNext(); {
-			v, _ := it.FlatNext()
-			result += v
-		}
-	case SparseCooMatrix, SparseDiagMatrix:
-		for it := array.Iter(); it.HasNext(); {
-			v, _ := it.Next()
-			result += v
-		}
-	}
+	array.VisitNonzero(func(pos []int, value float64) bool {
+		result += value
+		return true
+	})
 	return result
 }

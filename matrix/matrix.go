@@ -84,7 +84,8 @@ func M(shape []int, array ...float64) Matrix {
 // stored in coordinate format: each entry is stored as a (x, y, value) triple.
 func SparseCoo(rows, cols int) Matrix {
 	return &SparseCooF64Matrix{
-		shape: []int{rows, cols},
+		shape:  []int{rows, cols},
+		values: make(map[[2]int]float64),
 	}
 }
 

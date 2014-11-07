@@ -288,64 +288,176 @@ func TestSparseDiagItemMath(t *testing.T) {
 	})
 }
 
-func TestSparseDiagIters(t *testing.T) {
-	Convey("Given a diag array", t, func() {
-		a := Diag(1, 2, 3)
+func TestSparseDiagVisit(t *testing.T) {
+	Convey("Given a sparse diag array", t, func() {
+		a := SparseDiag(4, 3, 1.0, 2.0, 3.0)
 
-		Convey("FlatIter goes through the array in order", func() {
-			it := a.FlatIter()
-			for next := 0; next < 3; next++ {
-				So(it.HasNext(), ShouldBeTrue)
-				v, idx := it.FlatNext()
-				So(idx, ShouldEqual, next*4)
-				So(v, ShouldEqual, next+1)
-				So(a.FlatItem(idx), ShouldEqual, next+1)
-			}
-			So(it.HasNext(), ShouldBeFalse)
-			v, idx := it.FlatNext()
-			So(v, ShouldEqual, 0)
-			So(idx, ShouldEqual, 0)
+		Convey("Visit sees all items", func() {
+			saw := Zeros(a.Shape()...)
+			b := Zeros(a.Shape()...)
+			count := 0
+			a.Visit(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				return true
+			})
+			So(count, ShouldEqual, 12)
+			So(saw.CountNonzero(), ShouldEqual, 12)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 2, 0,
+				0, 0, 3,
+				0, 0, 0,
+			})
 		})
 
-		Convey("Iter goes through the array in order", func() {
-			it := a.Iter()
-			for row := 0; row < 3; row++ {
-				So(it.HasNext(), ShouldBeTrue)
-				v, idx := it.Next()
-				So(idx, ShouldResemble, []int{row, row})
-				So(v, ShouldEqual, row+1)
-				So(a.Item(idx...), ShouldEqual, row+1)
-			}
-			So(it.HasNext(), ShouldBeFalse)
-			v, idx := it.Next()
-			So(v, ShouldEqual, 0)
-			So(idx, ShouldBeNil)
+		Convey("Visit stops early if f() returns false", func() {
+			saw := Zeros(a.Shape()...)
+			b := Zeros(a.Shape()...)
+			count := 0
+			a.Visit(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				if saw.CountNonzero() >= 5 {
+					return false
+				}
+				return true
+			})
+			So(count, ShouldEqual, 5)
+			So(saw.CountNonzero(), ShouldEqual, 5)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 2, 0,
+				0, 0, 0,
+				0, 0, 0,
+			})
 		})
 
-		Convey("T().FlatIter goes through the array in order", func() {
-			tr := a.T()
-			it := tr.FlatIter()
-			for next := 0; next < 3; next++ {
-				So(it.HasNext(), ShouldBeTrue)
-				v, idx := it.FlatNext()
-				So(idx, ShouldEqual, next*4)
-				So(v, ShouldEqual, next+1)
-				So(a.FlatItem(idx), ShouldEqual, next+1)
-			}
-			So(it.HasNext(), ShouldBeFalse)
+		Convey("VisitNonzero sees just nonzero items", func() {
+			saw := Zeros(a.Shape()...)
+			b := Zeros(a.Shape()...)
+			count := 0
+			a.VisitNonzero(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				return true
+			})
+			So(count, ShouldEqual, 3)
+			So(saw.CountNonzero(), ShouldEqual, 3)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 2, 0,
+				0, 0, 3,
+				0, 0, 0,
+			})
 		})
 
-		Convey("T().Iter() goes through the array in order", func() {
-			tr := a.T()
-			it := tr.Iter()
-			for row := 0; row < 3; row++ {
-				So(it.HasNext(), ShouldBeTrue)
-				v, idx := it.Next()
-				So(idx, ShouldResemble, []int{row, row})
-				So(v, ShouldEqual, row+1)
-				So(a.Item(idx...), ShouldEqual, row+1)
-			}
-			So(it.HasNext(), ShouldBeFalse)
+		Convey("VisitNonzero stops early if f() returns false", func() {
+			saw := Zeros(a.Shape()...)
+			b := Zeros(a.Shape()...)
+			count := 0
+			a.VisitNonzero(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				if saw.CountNonzero() >= 2 {
+					return false
+				}
+				return true
+			})
+			So(count, ShouldEqual, 2)
+			So(saw.CountNonzero(), ShouldEqual, 2)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 2, 0,
+				0, 0, 0,
+				0, 0, 0,
+			})
+		})
+
+		Convey("T().Visit sees all items", func() {
+			saw := Zeros(a.T().Shape()...)
+			b := Zeros(a.T().Shape()...)
+			count := 0
+			a.T().Visit(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				return true
+			})
+			So(count, ShouldEqual, 12)
+			So(saw.CountNonzero(), ShouldEqual, 12)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 2, 0, 0,
+				0, 0, 3, 0,
+			})
+		})
+
+		Convey("T().Visit stops early if f() returns false", func() {
+			saw := Zeros(a.T().Shape()...)
+			b := Zeros(a.T().Shape()...)
+			count := 0
+			a.T().Visit(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				if saw.CountNonzero() >= 6 {
+					return false
+				}
+				return true
+			})
+			So(count, ShouldEqual, 6)
+			So(saw.CountNonzero(), ShouldEqual, 6)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 2, 0, 0,
+				0, 0, 0, 0,
+			})
+		})
+
+		Convey("T().VisitNonzero sees just nonzero items", func() {
+			saw := Zeros(a.T().Shape()...)
+			b := Zeros(a.T().Shape()...)
+			count := 0
+			a.T().VisitNonzero(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				return true
+			})
+			So(count, ShouldEqual, 3)
+			So(saw.CountNonzero(), ShouldEqual, 3)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 2, 0, 0,
+				0, 0, 3, 0,
+			})
+		})
+
+		Convey("T().VisitNonzero stops early if f() returns false", func() {
+			saw := Zeros(a.T().Shape()...)
+			b := Zeros(a.T().Shape()...)
+			count := 0
+			a.T().VisitNonzero(func(pos []int, value float64) bool {
+				count++
+				b.ItemSet(value, pos...)
+				saw.ItemSet(1, pos...)
+				if saw.CountNonzero() >= 2 {
+					return false
+				}
+				return true
+			})
+			So(count, ShouldEqual, 2)
+			So(saw.CountNonzero(), ShouldEqual, 2)
+			So(b.Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 2, 0, 0,
+				0, 0, 0, 0,
+			})
 		})
 	})
 }

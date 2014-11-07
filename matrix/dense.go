@@ -188,14 +188,6 @@ func (array DenseF64Array) FlatItemSet(value float64, index int) {
 	array.array[index] = value
 }
 
-// Return an iterator over populated matrix entries
-func (array *DenseF64Array) FlatIter() FlatNDArrayIterator {
-	return &denseIterator{
-		array:   array,
-		flatPos: 0,
-	}
-}
-
 // Get the matrix inverse
 func (array DenseF64Array) Inverse() (Matrix, error) {
 	return Inverse(&array)
@@ -255,14 +247,6 @@ func (array DenseF64Array) ItemSet(value float64, index ...int) {
 		shape = []int{array.shape[1], array.shape[0]}
 	}
 	array.array[ndToFlat(shape, index)] = value
-}
-
-// Return an iterator over populated matrix entries
-func (array *DenseF64Array) Iter() CoordNDArrayIterator {
-	return &denseIterator{
-		array:   array,
-		flatPos: 0,
-	}
 }
 
 // Solve for x, where ax = b.
@@ -402,39 +386,42 @@ func (array DenseF64Array) T() Matrix {
 	}
 }
 
-// Iterates over all array elements
-type denseIterator struct {
-	array   *DenseF64Array
-	flatPos int
+// Visit all matrix elements, invoking a method on each. If the method
+// returns false, iteration is aborted and VisitNonzero() returns false.
+// Otherwise, it returns true.
+func (array DenseF64Array) Visit(f func(pos []int, value float64) bool) bool {
+	for flat, value := range array.array {
+		var pos []int
+		if array.transpose {
+			pOrig := flatToNd([]int{array.shape[1], array.shape[0]}, flat)
+			pos = []int{pOrig[1], pOrig[0]}
+		} else {
+			pos = flatToNd(array.shape, flat)
+		}
+		if !f(pos, value) {
+			return false
+		}
+	}
+	return true
 }
 
-// Ask whether there are more values to iterate over.
-func (iter denseIterator) HasNext() bool {
-	return iter.flatPos < len(iter.array.array)
-}
-
-// Return the value and coordinates of the next entry
-func (iter *denseIterator) Next() (float64, []int) {
-	if iter.flatPos >= len(iter.array.array) {
-		return 0, nil
+// Visit just nonzero elements, invoking a method on each. If the method
+// returns false, iteration is aborted and VisitNonzero() returns false.
+// Otherwise, it returns true.
+func (array DenseF64Array) VisitNonzero(f func(pos []int, value float64) bool) bool {
+	for flat, value := range array.array {
+		if value != 0 {
+			var pos []int
+			if array.transpose {
+				pOrig := flatToNd([]int{array.shape[1], array.shape[0]}, flat)
+				pos = []int{pOrig[1], pOrig[0]}
+			} else {
+				pos = flatToNd(array.shape, flat)
+			}
+			if !f(pos, value) {
+				return false
+			}
+		}
 	}
-	flatPos := iter.flatPos
-	iter.flatPos++
-	if iter.array.transpose {
-		return iter.array.FlatItem(flatPos), flatToNd(iter.array.shape, flatPos)
-	}
-	return iter.array.array[flatPos], flatToNd(iter.array.shape, flatPos)
-}
-
-// Return the value and flat index of the next entry
-func (iter *denseIterator) FlatNext() (float64, int) {
-	if iter.flatPos >= len(iter.array.array) {
-		return 0, 0
-	}
-	flatPos := iter.flatPos
-	iter.flatPos++
-	if iter.array.transpose {
-		return iter.array.FlatItem(flatPos), flatPos
-	}
-	return iter.array.array[flatPos], flatPos
+	return true
 }

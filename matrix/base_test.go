@@ -1348,3 +1348,84 @@ func TestSub(t *testing.T) {
 		})
 	})
 }
+
+func BenchmarkMProdDenseDense(b *testing.B) {
+	l := Rand(5, 5).M()
+	r := Rand(5, 5).M()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdDenseCoo(b *testing.B) {
+	l := Rand(5, 5).M()
+	r := SparseRand(5, 5, 0.5)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdDenseDiag(b *testing.B) {
+	l := Rand(5, 5).M()
+	r := Diag(1, 2, 3, 4, 5)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdCooDense(b *testing.B) {
+	l := SparseRand(5, 5, 0.5)
+	r := Rand(5, 5).M()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdCooCoo(b *testing.B) {
+	l := SparseRand(5, 5, 0.5)
+	r := SparseRand(5, 5, 0.5)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdCooDiag(b *testing.B) {
+	l := SparseRand(5, 5, 0.5)
+	r := Diag(1, 2, 3, 4, 5)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdDiagDense(b *testing.B) {
+	l := Diag(1, 2, 3, 4, 5)
+	r := Rand(5, 5).M()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdDiagCoo(b *testing.B) {
+	l := Diag(1, 2, 3, 4, 5)
+	r := SparseRand(5, 5, 0.5)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}
+
+func BenchmarkMProdDiagDiag(b *testing.B) {
+	l := Diag(1, 2, 3, 4, 5)
+	r := Diag(5, 4, 3, 2, 1)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.MProd(r)
+	}
+}

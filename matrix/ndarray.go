@@ -1,18 +1,80 @@
 // The matrix package contains various utilities for dealing with raw matrices.
-// The interface is loosely based on the NumPy package in Python.
+// The interface is loosely based on the NumPy package in Python. At present,
+// all arrays store float64 values.
 //
-// The key interfaces here are:
+// NDArray
 //
-// NDArray – A multidimensional array, with dense and (2D-only) sparse
-// implementations.
+// The NDArray interface describes a multidimensional array. Both dense and
+// (2D-only) sparse implementations are available, with handy constructors for
+// various array types. In general, the methods in NDArray are those methods
+// which would make sense for an array of any dimensionality.
 //
-// Matrix – A two-dimensional array, with various methods only available when
-// working in two dimensions.  A two-dimensional NDArray can be
-// trivially converted to the Matrix type by calling arr.M().
+// The following constructors all create dense arrays. For sparse
+// representations, see the Matrix constructors below.
+//
+// To create a one dimensional, initialized array:
+//     a0 := A1(1.0, 2.0, 3.0)
+//
+// To create a 2x3 array containing all zeros, use one of:
+//     a1 := Dense(2, 3)
+//     a2 := Zeros(2, 3)
+//
+// To create a 2x3 array containing all ones, use:
+//     a3 := Ones(2, 3)
+//
+// To create a 2x3 array with initialized values:
+//     a4 := A([]int{2,3},
+//             1.0, 2.0, 3.0,
+//             4.0, 5.0, 6.0)
+//     a5 := A2([]float64{1.0, 2.0, 3.0},
+//              []float64{4.0, 5.0, 6.0})
+//
+// To create a 2x3 array initialized to some arbitrary value:
+//     a6 := WithValue(0.1, 2, 3)
+//
+// To create a 2x3 array with random values uniformly distributed in [0, 1):
+//     a7 := Rand(2, 3)
+//
+// To create a 2x3 array with random values on the standard normal distribution:
+//     a8 := RandN(2, 3)
+//
+// Matrix
+//
+// The Matrix interface describes operations suited to a two-dimensional array.
+// Note that a two-dimensional NDArray can be trivially converted to the Matrix
+// type by calling arr.M(). The resulting object will generally be the same,
+// but converted to the Matrix type.
+//
+// The following representations are available.
+// A dense matrix stores all values in a []float64.
+// A sparse diagonal matrix stores the elements of the main diagonal in a
+// []float64, and assumes off-diagonal elements are zero.
+// A sparse coo matrix stores nonzero items by position in a map[[2]int]float64.
 //
 // When possible, function implementations take advantage of matrix sparsity.
 // For instance, MProd(), the matrix multiplication function, performs the
 // minimum amount of work required based on the types of its arguments.
+//
+// To create a 2x3 matrix with initialized values:
+//     m0 := M([]int{2,3},
+//             1.0, 2.0, 3.0,
+//             4.0, 5.0, 6.0)
+//
+// To create a 4x4 matrix with sparse diagonal representation:
+//     m1 := Diag(1.0, 2.0, 3.0, 4.0)
+//
+// To create a 4x6 matrix with sparse diagonal representation:
+//     m2 := SparseDiag(4, 6, 1.0, 2.0, 3.0, 4.0)
+//
+// To create a 4x4 identity matrix with sparse diagonal representation:
+//     m3 := Eye(4)
+//
+// To create an unpopulated 3x4 sparse coo matrix:
+//     m4 := SparseCoo(3, 4)
+//
+// To create a 3x4 sparse coo with half the items randomly populated:
+//     m5 := SparseRand(3, 4, 0.5)
+//     m6 := SparseRandN(3, 4, 0.5)
 //
 // Certain linear algebra methods, particularly in the Matrix interface, rely
 // on BLAS. In order to use it, you will need to register an appropriate engine.
@@ -106,9 +168,6 @@ type NDArray interface {
 	// Set an array element in a flattened version of this array
 	FlatItemSet(value float64, index int)
 
-	// Return an iterator over populated matrix entries
-	FlatIter() FlatNDArrayIterator
-
 	// Get an array element
 	Item(index ...int) float64
 
@@ -126,9 +185,6 @@ type NDArray interface {
 
 	// Set an array element
 	ItemSet(value float64, index ...int)
-
-	// Return an iterator over populated matrix entries
-	Iter() CoordNDArrayIterator
 
 	// Returns the array as a matrix. This is only possible for 1D and 2D arrays;
 	// 1D arrays of length n are converted into n x 1 vectors.
@@ -174,6 +230,16 @@ type NDArray interface {
 
 	// Return the sum of all array elements
 	Sum() float64
+
+	// Visit all matrix elements, invoking a method on each. If the method
+	// returns false, iteration is aborted and VisitNonzero() returns false.
+	// Otherwise, it returns true.
+	Visit(f func(pos []int, value float64) bool) bool
+
+	// Visit just nonzero elements, invoking a method on each. If the method
+	// returns false, iteration is aborted and VisitNonzero() returns false.
+	// Otherwise, it returns true.
+	VisitNonzero(f func(pos []int, value float64) bool) bool
 }
 
 // Create an array from literal data
@@ -199,17 +265,17 @@ func A1(values ...float64) NDArray {
 }
 
 // Create a 2D array
-func A2(values ...[]float64) NDArray {
+func A2(rows ...[]float64) NDArray {
 	array := &DenseF64Array{
-		shape: []int{len(values), len(values[0])},
-		array: make([]float64, len(values)*len(values[0])),
+		shape: []int{len(rows), len(rows[0])},
+		array: make([]float64, len(rows)*len(rows[0])),
 	}
 	for i0 := 0; i0 < array.shape[0]; i0++ {
-		if len(values[i0]) != array.shape[1] {
-			panic(fmt.Sprintf("A2 got inconsistent array lengths %d and %d", array.shape[1], len(values[i0])))
+		if len(rows[i0]) != array.shape[1] {
+			panic(fmt.Sprintf("A2 got inconsistent array lengths %d and %d", array.shape[1], len(rows[i0])))
 		}
 		for i1 := 0; i1 < array.shape[1]; i1++ {
-			array.ItemSet(values[i0][i1], i0, i1)
+			array.ItemSet(rows[i0][i1], i0, i1)
 		}
 	}
 	return array
