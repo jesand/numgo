@@ -50,6 +50,18 @@ func makeCyclic(factory func(directed bool, maxNodes int) Graph) Graph {
 	return graph
 }
 
+func TestErrors(t *testing.T) {
+	Convey("ErrGraphCapacity has the right error message", t, func() {
+		So(ErrGraphCapacity{}.Error(), ShouldEqual, "The graph cannot store any additional nodes")
+	})
+	Convey("ErrInvalidNode has the right error message", t, func() {
+		So(ErrInvalidNode{}.Error(), ShouldEqual, "Invalid graph node ID")
+	})
+	Convey("ErrGraphIsCyclic has the right error message", t, func() {
+		So(ErrGraphIsCyclic{}.Error(), ShouldEqual, "Graph contains cycles")
+	})
+}
+
 func TestAddEdge(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given an empty graph", t, func() {
@@ -238,6 +250,13 @@ func TestAddNode(t *testing.T) {
 				nodes, _ := g.Size()
 				So(nodes, ShouldEqual, 2)
 			})
+
+			Convey("AddNode panics when it reaches capacity", func() {
+				for i := 0; i < 10; i++ {
+					g.AddNode("")
+				}
+				So(func() { g.AddNode("") }, ShouldPanic)
+			})
 		})
 	}
 }
@@ -246,6 +265,11 @@ func TestChildren(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given a populated graph", t, func() {
 			g := makeTree(factory)
+
+			Convey("Children panics with an invalid node ID", func() {
+				So(func() { g.Children(10) }, ShouldPanic)
+			})
+
 			Convey("Children works when there are children", func() {
 				So(g.Children(0), ShouldResemble, []Node{{
 					ID:        1,
@@ -271,6 +295,10 @@ func TestChildrenWithWeights(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given a populated graph", t, func() {
 			g := makeTree(factory)
+
+			Convey("ChildrenWithWeights panics with an invalid node ID", func() {
+				So(func() { g.ChildrenWithWeights(10) }, ShouldPanic)
+			})
 
 			Convey("ChildrenWithWeights works when there are children", func() {
 				children, weights := g.ChildrenWithWeights(0)
@@ -413,6 +441,14 @@ func TestHasPath(t *testing.T) {
 		Convey("Given a graph with edges (u, v) and (v, w)", t, func() {
 			g := makeTree(factory)
 
+			Convey("HasPath(u, v) panics when u is invalid", func() {
+				So(func() { g.HasPath(10, 1) }, ShouldPanic)
+			})
+
+			Convey("HasPath(u, v) panics when v is invalid", func() {
+				So(func() { g.HasPath(0, 10) }, ShouldPanic)
+			})
+
 			Convey("HasPath(u, v) is true", func() {
 				So(g.HasPath(0, 1), ShouldBeTrue)
 			})
@@ -529,6 +565,27 @@ func TestIsDirected(t *testing.T) {
 	}
 }
 
+func TestNode(t *testing.T) {
+	for _, factory := range graphFactories {
+		Convey("Given a populated graph", t, func() {
+			g := makeTree(factory)
+
+			Convey("Node panics with an invalid node ID", func() {
+				So(func() { g.Node(10) }, ShouldPanic)
+			})
+
+			Convey("Node works with a valid node ID", func() {
+				So(g.Node(2), ShouldResemble, Node{
+					ID:        2,
+					Name:      "c",
+					InDegree:  1,
+					OutDegree: 0,
+				})
+			})
+		})
+	}
+}
+
 func TestIsTree(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given an empty graph", t, func() {
@@ -619,6 +676,10 @@ func TestParents(t *testing.T) {
 		Convey("Given a populated graph", t, func() {
 			g := makeTree(factory)
 
+			Convey("Parents panics with an invalid node ID", func() {
+				So(func() { g.Parents(10) }, ShouldPanic)
+			})
+
 			Convey("Parents works when there are parents", func() {
 				So(g.Parents(1), ShouldResemble, []Node{{
 					ID:        0,
@@ -639,6 +700,10 @@ func TestParentsWithWeights(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given a populated graph", t, func() {
 			g := makeTree(factory)
+
+			Convey("ParentsWithWeights panics with an invalid node ID", func() {
+				So(func() { g.ParentsWithWeights(10) }, ShouldPanic)
+			})
 
 			Convey("ParentsWithWeights works when there are parents", func() {
 				parents, weights := g.ParentsWithWeights(1)
@@ -695,6 +760,33 @@ func TestRemoveEdge(t *testing.T) {
 				So(func() { g.RemoveEdge(0, 11) }, ShouldPanic)
 			})
 		})
+
+		Convey("Given an undirected graph", t, func() {
+			g := factory(false, 10)
+			u := g.AddNode("u")
+			v := g.AddNode("v")
+			w := g.AddNode("w")
+			g.AddEdge(u, v)
+			g.AddEdge(v, w)
+
+			Convey("RemoveEdge(u, v) succeeds", func() {
+				g.RemoveEdge(u, v)
+				So(g.Children(u), ShouldBeEmpty)
+				So(g.Children(v), ShouldResemble, []Node{{
+					ID:        w,
+					Name:      "w",
+					InDegree:  1,
+					OutDegree: 1,
+				}})
+				So(g.Parents(u), ShouldBeEmpty)
+				So(g.Parents(v), ShouldResemble, []Node{{
+					ID:        w,
+					Name:      "w",
+					InDegree:  1,
+					OutDegree: 1,
+				}})
+			})
+		})
 	}
 }
 
@@ -731,6 +823,14 @@ func TestShortestPath(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given a populated graph", t, func() {
 			g := makeDag(factory)
+
+			Convey("ShortestPath(u, v) panics when u is invalid", func() {
+				So(func() { g.ShortestPath(10, 0) }, ShouldPanic)
+			})
+
+			Convey("ShortestPath(u, v) panics when v is invalid", func() {
+				So(func() { g.ShortestPath(0, 10) }, ShouldPanic)
+			})
 
 			Convey("ShortestPath(u, u) returns u", func() {
 				path, weights := g.ShortestPath(0, 0)
@@ -793,6 +893,14 @@ func TestShortestPathWeight(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given a populated graph", t, func() {
 			g := makeDag(factory)
+
+			Convey("ShortestPathWeight(u, v) panics when u is invalid", func() {
+				So(func() { g.ShortestPathWeight(10, 0) }, ShouldPanic)
+			})
+
+			Convey("ShortestPathWeight(u, v) panics when v is invalid", func() {
+				So(func() { g.ShortestPathWeight(0, 10) }, ShouldPanic)
+			})
 
 			Convey("ShortestPathWeight(u, u) returns 0", func() {
 				So(g.ShortestPathWeight(0, 0), ShouldEqual, 0)
