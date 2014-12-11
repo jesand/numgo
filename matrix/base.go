@@ -423,7 +423,7 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 				result = SparseCoo(leftSh[0], rightSh[1])
 				spRes := result.(*sparseCooF64Matrix)
 				right.VisitNonzero(func(pos []int, value float64) bool {
-					spRes.values[[2]int{pos[0], pos[1]}] += lDiag[pos[0]] * value
+					spRes.values[pos[0]][pos[1]] += lDiag[pos[0]] * value
 					return true
 				})
 			default:
@@ -440,10 +440,10 @@ func MProd(array Matrix, others ...Matrix) Matrix {
 		} else if leftSp == SparseCooMatrix && rightSp == SparseCooMatrix {
 			result = SparseCoo(leftSh[0], rightSh[1])
 			spRes := result.(*sparseCooF64Matrix)
-			rArr := right.Array()
+			spRight := right.(*sparseCooF64Matrix)
 			left.VisitNonzero(func(pos []int, value float64) bool {
 				for j := 0; j < rightSh[1]; j++ {
-					spRes.values[[2]int{pos[0], j}] += value * rArr[pos[1]*rightSh[1]+j]
+					spRes.values[pos[0]][j] += value * spRight.values[pos[1]][j]
 				}
 				return true
 			})

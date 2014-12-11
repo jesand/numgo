@@ -362,6 +362,23 @@ func (array sparseDiagF64Matrix) Slice(from []int, to []int) NDArray {
 	return Slice(&array, from, to)
 }
 
+// Return a sparse coo copy of the matrix. The method will panic
+// if any off-diagonal elements are nonzero.
+func (array sparseDiagF64Matrix) SparseCoo() Matrix {
+	m := SparseCoo(array.shape[0], array.shape[1])
+	array.VisitNonzero(func(pos []int, value float64) bool {
+		m.ItemSet(value, pos[0], pos[1])
+		return true
+	})
+	return m
+}
+
+// Return a sparse diag copy of the matrix. The method will panic
+// if any off-diagonal elements are nonzero.
+func (array sparseDiagF64Matrix) SparseDiag() Matrix {
+	return array.copy()
+}
+
 // Ask whether the matrix has a sparse representation (useful for optimization)
 func (array sparseDiagF64Matrix) Sparsity() ArraySparsity {
 	return SparseDiagMatrix

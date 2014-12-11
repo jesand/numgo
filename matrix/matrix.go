@@ -51,6 +51,14 @@ type Matrix interface {
 	// Return the same matrix, but with axes transposed. The same data is used,
 	// for speed and memory efficiency. Use Copy() to create a new array.
 	T() Matrix
+
+	// Return a sparse coo copy of the matrix. The method will panic
+	// if any off-diagonal elements are nonzero.
+	SparseCoo() Matrix
+
+	// Return a sparse diag copy of the matrix. The method will panic
+	// if any off-diagonal elements are nonzero.
+	SparseDiag() Matrix
 }
 
 // Create a square matrix with the specified elements on the main diagonal, and
@@ -73,20 +81,28 @@ func Eye(size int) Matrix {
 }
 
 // Create a matrix from literal data
-func M(shape []int, array ...float64) Matrix {
-	if len(shape) != 2 {
-		panic(fmt.Sprintf("A matrix should be 2D, not %dD", len(shape)))
-	}
-	return A(shape, array...).M()
+func M(rows, cols int, array ...float64) Matrix {
+	return A([]int{rows, cols}, array...).M()
 }
 
 // Create a sparse matrix of the specified dimensionality. This matrix will be
 // stored in coordinate format: each entry is stored as a (x, y, value) triple.
-func SparseCoo(rows, cols int) Matrix {
-	return &sparseCooF64Matrix{
+// The first len(array) elements of the matrix will be initialized to the
+// corresponding nonzero values of array.
+func SparseCoo(rows, cols int, array ...float64) Matrix {
+	m := &sparseCooF64Matrix{
 		shape:  []int{rows, cols},
-		values: make(map[[2]int]float64),
+		values: make([]map[int]float64, rows),
 	}
+	for i := 0; i < rows; i++ {
+		m.values[i] = make(map[int]float64)
+	}
+	for idx, val := range array {
+		if val != 0 {
+			m.ItemSet(val, flatToNd(m.shape, idx)...)
+		}
+	}
+	return m
 }
 
 // Create a sparse matrix of the specified dimensionality. This matrix will be

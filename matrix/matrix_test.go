@@ -86,18 +86,13 @@ func TestEye(t *testing.T) {
 }
 
 func TestM(t *testing.T) {
-	Convey("M() panics when not given two dimensions", t, func() {
-		So(func() { M([]int{5}, 1, 2, 3, 4, 5) }, ShouldPanic)
-		So(func() { M([]int{5, 1, 1}, 1, 2, 3, 4, 5) }, ShouldPanic)
-	})
-
 	Convey("M() panics when data doesn't match dimensions", t, func() {
-		So(func() { M([]int{2, 3}, 1, 2, 3, 4, 5) }, ShouldPanic)
-		So(func() { M([]int{2, 3}, 1, 2, 3, 4, 5, 6, 7) }, ShouldPanic)
+		So(func() { M(2, 3, 1, 2, 3, 4, 5) }, ShouldPanic)
+		So(func() { M(2, 3, 1, 2, 3, 4, 5, 6, 7) }, ShouldPanic)
 	})
 
 	Convey("Given a vector created with M", t, func() {
-		m := M([]int{5, 1}, 1, 2, 3, 4, 5)
+		m := M(5, 1, 1, 2, 3, 4, 5)
 		Convey("Shape() is 5,1", func() {
 			So(m.Shape(), ShouldResemble, []int{5, 1})
 		})
@@ -110,7 +105,7 @@ func TestM(t *testing.T) {
 	})
 
 	Convey("Given a 2D matrix created with M", t, func() {
-		m := M([]int{2, 3}, 1, 2, 3, 4, 5, 6)
+		m := M(2, 3, 1, 2, 3, 4, 5, 6)
 		Convey("Shape() is 2, 3", func() {
 			So(m.Shape(), ShouldResemble, []int{2, 3})
 		})
@@ -343,11 +338,11 @@ func TestInverse(t *testing.T) {
 
 func TestLDivide(t *testing.T) {
 	Convey("Given a simple division problem", t, func() {
-		a := M([]int{3, 3},
+		a := M(3, 3,
 			8, 1, 6,
 			3, 5, 7,
 			4, 9, 2)
-		b := M([]int{3, 1},
+		b := M(3, 1,
 			15,
 			15,
 			15)
@@ -373,11 +368,11 @@ func TestLDivide(t *testing.T) {
 	})
 
 	Convey("Given a singular division problem", t, func() {
-		a := M([]int{3, 3},
+		a := M(3, 3,
 			0, 0, 0,
 			3, 5, 7,
 			4, 9, 2)
-		b := M([]int{3, 1},
+		b := M(3, 1,
 			15,
 			15,
 			15)
@@ -395,7 +390,7 @@ func TestLDivide(t *testing.T) {
 
 func TestNorm(t *testing.T) {
 	Convey("Given a 3x3 matrix", t, func() {
-		m := M([]int{3, 3},
+		m := M(3, 3,
 			1, 2, 3,
 			4, 5, 6,
 			7, 8, 9)
@@ -416,11 +411,11 @@ func TestNorm(t *testing.T) {
 
 func TestSolve(t *testing.T) {
 	Convey("Given a simple division problem", t, func() {
-		a := M([]int{3, 3},
+		a := M(3, 3,
 			8, 1, 6,
 			3, 5, 7,
 			4, 9, 2)
-		b := M([]int{3, 1},
+		b := M(3, 1,
 			15,
 			15,
 			15)
@@ -446,11 +441,11 @@ func TestSolve(t *testing.T) {
 	})
 
 	Convey("Given a singular division problem", t, func() {
-		a := M([]int{3, 3},
+		a := M(3, 3,
 			0, 0, 0,
 			3, 5, 7,
 			4, 9, 2)
-		b := M([]int{3, 1},
+		b := M(3, 1,
 			15,
 			15,
 			15)

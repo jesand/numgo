@@ -134,6 +134,88 @@ func TestDenseApply(t *testing.T) {
 	})
 }
 
+func TestDenseConversion(t *testing.T) {
+	Convey("Given an array", t, func() {
+		a := M(3, 4,
+			1, 2, 0, 0,
+			0, 3, 4, 0,
+			0, 0, 5, 6)
+
+		Convey("Conversion to Dense works", func() {
+			b := a.Dense()
+			So(b.Dense().Shape(), ShouldResemble, []int{3, 4})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 2, 0, 0,
+				0, 3, 4, 0,
+				0, 0, 5, 6,
+			})
+		})
+
+		Convey("Conversion of transpose to Dense works", func() {
+			b := a.T().Dense()
+			So(b.Dense().Shape(), ShouldResemble, []int{4, 3})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				2, 3, 0,
+				0, 4, 5,
+				0, 0, 6,
+			})
+		})
+
+		Convey("Conversion to sparse coo works", func() {
+			b := a.SparseCoo()
+			So(b.Dense().Shape(), ShouldResemble, []int{3, 4})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 2, 0, 0,
+				0, 3, 4, 0,
+				0, 0, 5, 6,
+			})
+		})
+
+		Convey("Conversion of transpose to sparse coo works", func() {
+			b := a.T().SparseCoo()
+			So(b.Dense().Shape(), ShouldResemble, []int{4, 3})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				2, 3, 0,
+				0, 4, 5,
+				0, 0, 6,
+			})
+		})
+
+		Convey("Conversion to diag panics if matrix is not diagonal", func() {
+			So(func() { a.SparseDiag() }, ShouldPanic)
+		})
+
+		Convey("Conversion to diag works", func() {
+			a.ItemSet(0, 0, 1)
+			a.ItemSet(0, 1, 2)
+			a.ItemSet(0, 2, 3)
+			b := a.SparseDiag()
+			So(b.Dense().Shape(), ShouldResemble, []int{3, 4})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 3, 0, 0,
+				0, 0, 5, 0,
+			})
+		})
+
+		Convey("Conversion of transpose to diag works", func() {
+			a.ItemSet(0, 0, 1)
+			a.ItemSet(0, 1, 2)
+			a.ItemSet(0, 2, 3)
+			b := a.T().SparseDiag()
+			So(b.Dense().Shape(), ShouldResemble, []int{4, 3})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 3, 0,
+				0, 0, 5,
+				0, 0, 0,
+			})
+		})
+	})
+}
+
 func TestDenseColColSetCols(t *testing.T) {
 	Convey("Given a dense array", t, func() {
 		a := A([]int{3, 4},
@@ -192,7 +274,7 @@ func TestDenseColColSetCols(t *testing.T) {
 
 func TestDenseDiag(t *testing.T) {
 	Convey("Given a dense array", t, func() {
-		a := M([]int{4, 3},
+		a := M(4, 3,
 			1, 2, 3,
 			4, 5, 6,
 			7, 8, 9,
@@ -227,7 +309,7 @@ func TestDenseEqual(t *testing.T) {
 
 func TestDenseInverseNormLDivide(t *testing.T) {
 	Convey("Given an invertible square matrix", t, func() {
-		m := M([]int{2, 2},
+		m := M(2, 2,
 			4, 7,
 			2, 6)
 
@@ -255,7 +337,7 @@ func TestDenseInverseNormLDivide(t *testing.T) {
 	})
 
 	Convey("Given a 3x3 matrix", t, func() {
-		m := M([]int{3, 3},
+		m := M(3, 3,
 			1, 2, 3,
 			4, 5, 6,
 			7, 8, 9)
@@ -274,11 +356,11 @@ func TestDenseInverseNormLDivide(t *testing.T) {
 	})
 
 	Convey("Given a simple division problem", t, func() {
-		a := M([]int{3, 3},
+		a := M(3, 3,
 			8, 1, 6,
 			3, 5, 7,
 			4, 9, 2)
-		b := M([]int{3, 1},
+		b := M(3, 1,
 			15,
 			15,
 			15)
@@ -306,7 +388,7 @@ func TestDenseInverseNormLDivide(t *testing.T) {
 
 func TestDenseItemMath(t *testing.T) {
 	Convey("Given a dense array", t, func() {
-		a := M([]int{4, 3},
+		a := M(4, 3,
 			1, 2, 3,
 			4, 5, 6,
 			7, 8, 9,
@@ -363,9 +445,133 @@ func TestDenseItemMath(t *testing.T) {
 	})
 }
 
+func TestDenseRowRowSetRows(t *testing.T) {
+	Convey("Given a dense array", t, func() {
+		a := M(4, 3,
+			1, 2, 3,
+			4, 5, 6,
+			7, 8, 9,
+			10, 11, 12,
+		)
+
+		Convey("Row panics with invalid input", func() {
+			So(func() { a.Row(-1) }, ShouldPanic)
+			So(func() { a.Row(4) }, ShouldPanic)
+		})
+
+		Convey("Row works", func() {
+			So(a.Row(0), ShouldResemble, []float64{1, 2, 3})
+			So(a.Row(1), ShouldResemble, []float64{4, 5, 6})
+			So(a.Row(2), ShouldResemble, []float64{7, 8, 9})
+			So(a.Row(3), ShouldResemble, []float64{10, 11, 12})
+		})
+
+		Convey("RowSet panics with invalid input", func() {
+			So(func() { a.RowSet(-1, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(4, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1, 2, 3}) }, ShouldPanic)
+		})
+
+		Convey("RowSet works", func() {
+			a.RowSet(0, []float64{0, 1, 2})
+			So(a.Array(), ShouldResemble, []float64{
+				0, 1, 2,
+				4, 5, 6,
+				7, 8, 9,
+				10, 11, 12,
+			})
+			a.RowSet(1, []float64{0, 1, 2})
+			So(a.Array(), ShouldResemble, []float64{
+				0, 1, 2,
+				0, 1, 2,
+				7, 8, 9,
+				10, 11, 12,
+			})
+			a.RowSet(2, []float64{0, 1, 2})
+			So(a.Array(), ShouldResemble, []float64{
+				0, 1, 2,
+				0, 1, 2,
+				0, 1, 2,
+				10, 11, 12,
+			})
+			a.RowSet(3, []float64{0, 1, 2})
+			So(a.Array(), ShouldResemble, []float64{
+				0, 1, 2,
+				0, 1, 2,
+				0, 1, 2,
+				0, 1, 2,
+			})
+		})
+	})
+}
+
+func TestDenseTranspose(t *testing.T) {
+	Convey("Given a transposed matrix", t, func() {
+		a := M(4, 3,
+			1, 2, 3,
+			4, 5, 6,
+			7, 8, 9,
+			10, 11, 12,
+		)
+		tr := a.T()
+
+		Convey("The matrix statistics are correct", func() {
+			So(tr.Size(), ShouldEqual, 12)
+			So(tr.Shape(), ShouldResemble, []int{3, 4})
+		})
+
+		Convey("FlatItem and FlatItemSet work", func() {
+			tr.FlatItemSet(-1, 7)
+			So(tr.Item(1, 2), ShouldEqual, 8)
+			So(tr.Item(1, 3), ShouldEqual, -1)
+			So(tr.FlatItem(6), ShouldEqual, 8)
+			So(tr.FlatItem(7), ShouldEqual, -1)
+		})
+
+		Convey("Item and ItemSet work", func() {
+			tr.ItemSet(-1, 2, 3)
+			So(tr.Item(1, 2), ShouldEqual, 8)
+			So(tr.Item(2, 3), ShouldEqual, -1)
+			So(tr.FlatItem(11), ShouldEqual, -1)
+			So(tr.FlatItem(6), ShouldEqual, 8)
+		})
+
+		Convey("Array() is correct", func() {
+			So(a.Array(), ShouldResemble, []float64{
+				1, 2, 3,
+				4, 5, 6,
+				7, 8, 9,
+				10, 11, 12,
+			})
+			So(tr.Array(), ShouldResemble, []float64{
+				1, 4, 7, 10,
+				2, 5, 8, 11,
+				3, 6, 9, 12,
+			})
+		})
+
+		Convey("Copy() is correct", func() {
+			So(tr.Copy().Array(), ShouldResemble, []float64{
+				1, 4, 7, 10,
+				2, 5, 8, 11,
+				3, 6, 9, 12,
+			})
+		})
+
+		Convey("Ravel() is correct", func() {
+			So(tr.Ravel().Array(), ShouldResemble, []float64{
+				1, 4, 7, 10,
+				2, 5, 8, 11,
+				3, 6, 9, 12,
+			})
+		})
+	})
+}
+
 func TestDenseVisit(t *testing.T) {
 	Convey("Given a dense array", t, func() {
-		a := M([]int{4, 3},
+		a := M(4, 3,
 			0, 2, 3,
 			4, 0, 6,
 			7, 8, 0,
@@ -537,130 +743,6 @@ func TestDenseVisit(t *testing.T) {
 				0, 4, 7, 0,
 				2, 0, 0, 0,
 				3, 6, 0, 0,
-			})
-		})
-	})
-}
-
-func TestDenseRowRowSetRows(t *testing.T) {
-	Convey("Given a dense array", t, func() {
-		a := M([]int{4, 3},
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9,
-			10, 11, 12,
-		)
-
-		Convey("Row panics with invalid input", func() {
-			So(func() { a.Row(-1) }, ShouldPanic)
-			So(func() { a.Row(4) }, ShouldPanic)
-		})
-
-		Convey("Row works", func() {
-			So(a.Row(0), ShouldResemble, []float64{1, 2, 3})
-			So(a.Row(1), ShouldResemble, []float64{4, 5, 6})
-			So(a.Row(2), ShouldResemble, []float64{7, 8, 9})
-			So(a.Row(3), ShouldResemble, []float64{10, 11, 12})
-		})
-
-		Convey("RowSet panics with invalid input", func() {
-			So(func() { a.RowSet(-1, []float64{0, 1, 2}) }, ShouldPanic)
-			So(func() { a.RowSet(4, []float64{0, 1, 2}) }, ShouldPanic)
-			So(func() { a.RowSet(0, []float64{0, 1}) }, ShouldPanic)
-			So(func() { a.RowSet(0, []float64{0, 1, 2, 3}) }, ShouldPanic)
-		})
-
-		Convey("RowSet works", func() {
-			a.RowSet(0, []float64{0, 1, 2})
-			So(a.Array(), ShouldResemble, []float64{
-				0, 1, 2,
-				4, 5, 6,
-				7, 8, 9,
-				10, 11, 12,
-			})
-			a.RowSet(1, []float64{0, 1, 2})
-			So(a.Array(), ShouldResemble, []float64{
-				0, 1, 2,
-				0, 1, 2,
-				7, 8, 9,
-				10, 11, 12,
-			})
-			a.RowSet(2, []float64{0, 1, 2})
-			So(a.Array(), ShouldResemble, []float64{
-				0, 1, 2,
-				0, 1, 2,
-				0, 1, 2,
-				10, 11, 12,
-			})
-			a.RowSet(3, []float64{0, 1, 2})
-			So(a.Array(), ShouldResemble, []float64{
-				0, 1, 2,
-				0, 1, 2,
-				0, 1, 2,
-				0, 1, 2,
-			})
-		})
-	})
-}
-
-func TestDenseTranspose(t *testing.T) {
-	Convey("Given a transposed matrix", t, func() {
-		a := M([]int{4, 3},
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9,
-			10, 11, 12,
-		)
-		tr := a.T()
-
-		Convey("The matrix statistics are correct", func() {
-			So(tr.Size(), ShouldEqual, 12)
-			So(tr.Shape(), ShouldResemble, []int{3, 4})
-		})
-
-		Convey("FlatItem and FlatItemSet work", func() {
-			tr.FlatItemSet(-1, 7)
-			So(tr.Item(1, 2), ShouldEqual, 8)
-			So(tr.Item(1, 3), ShouldEqual, -1)
-			So(tr.FlatItem(6), ShouldEqual, 8)
-			So(tr.FlatItem(7), ShouldEqual, -1)
-		})
-
-		Convey("Item and ItemSet work", func() {
-			tr.ItemSet(-1, 2, 3)
-			So(tr.Item(1, 2), ShouldEqual, 8)
-			So(tr.Item(2, 3), ShouldEqual, -1)
-			So(tr.FlatItem(11), ShouldEqual, -1)
-			So(tr.FlatItem(6), ShouldEqual, 8)
-		})
-
-		Convey("Array() is correct", func() {
-			So(a.Array(), ShouldResemble, []float64{
-				1, 2, 3,
-				4, 5, 6,
-				7, 8, 9,
-				10, 11, 12,
-			})
-			So(tr.Array(), ShouldResemble, []float64{
-				1, 4, 7, 10,
-				2, 5, 8, 11,
-				3, 6, 9, 12,
-			})
-		})
-
-		Convey("Copy() is correct", func() {
-			So(tr.Copy().Array(), ShouldResemble, []float64{
-				1, 4, 7, 10,
-				2, 5, 8, 11,
-				3, 6, 9, 12,
-			})
-		})
-
-		Convey("Ravel() is correct", func() {
-			So(tr.Ravel().Array(), ShouldResemble, []float64{
-				1, 4, 7, 10,
-				2, 5, 8, 11,
-				3, 6, 9, 12,
 			})
 		})
 	})

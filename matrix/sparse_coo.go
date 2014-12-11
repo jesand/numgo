@@ -7,7 +7,7 @@ import (
 // A sparse 2D Matrix with coordinate representation
 type sparseCooF64Matrix struct {
 	shape     []int
-	values    map[[2]int]float64
+	values    []map[int]float64
 	transpose bool
 }
 
@@ -75,10 +75,8 @@ func (array sparseCooF64Matrix) Col(col int) []float64 {
 		panic(fmt.Sprintf("Can't get column %d from a %dx%d array", col, array.shape[0], array.shape[1]))
 	}
 	result := make([]float64, array.shape[1])
-	for pos, v := range array.values {
-		if pos[1] == col {
-			result[pos[0]] = v
-		}
+	for row, val := range array.values {
+		result[row] = val[col]
 	}
 	return result
 }
@@ -102,18 +100,18 @@ func (array sparseCooF64Matrix) Copy() NDArray {
 
 // Returns a duplicate of this array, preserving type
 func (array sparseCooF64Matrix) copy() *sparseCooF64Matrix {
-	result := &sparseCooF64Matrix{
-		shape:  make([]int, len(array.shape)),
-		values: make(map[[2]int]float64),
-	}
-	copy(result.shape[:], array.shape[:])
+	result := SparseCoo(array.shape[0], array.shape[1]).(*sparseCooF64Matrix)
 	if array.transpose {
-		for pos, v := range array.values {
-			result.values[[2]int{pos[1], pos[0]}] = v
+		for row, val := range array.values {
+			for col, v := range val {
+				result.values[col][row] = v
+			}
 		}
 	} else {
-		for pos, v := range array.values {
-			result.values[[2]int{pos[0], pos[1]}] = v
+		for row, val := range array.values {
+			for col, v := range val {
+				result.values[row][col] = v
+			}
 		}
 	}
 	return result
@@ -122,10 +120,8 @@ func (array sparseCooF64Matrix) copy() *sparseCooF64Matrix {
 // Counts the number of nonzero elements in the array
 func (array sparseCooF64Matrix) CountNonzero() int {
 	count := 0
-	for _, v := range array.values {
-		if v != 0 {
-			count++
-		}
+	for _, val := range array.values {
+		count += len(val)
 	}
 	return count
 }
@@ -134,11 +130,13 @@ func (array sparseCooF64Matrix) CountNonzero() int {
 func (array sparseCooF64Matrix) Dense() NDArray {
 	var result NDArray
 	result = Dense(array.shape...)
-	for pos, val := range array.values {
-		if array.transpose {
-			result.ItemSet(val, pos[1], pos[0])
-		} else {
-			result.ItemSet(val, pos[0], pos[1])
+	for row, val := range array.values {
+		for col, v := range val {
+			if array.transpose {
+				result.ItemSet(v, col, row)
+			} else {
+				result.ItemSet(v, row, col)
+			}
 		}
 	}
 	return result
@@ -151,10 +149,8 @@ func (array sparseCooF64Matrix) Diag() Matrix {
 		size = array.shape[1]
 	}
 	result := Dense(size, 1).M()
-	for pos, v := range array.values {
-		if pos[0] == pos[1] {
-			result.ItemSet(v, pos[0], 0)
-		}
+	for row, val := range array.values {
+		result.ItemSet(val[row], row, 0)
 	}
 	return result
 }
@@ -201,24 +197,22 @@ func (array sparseCooF64Matrix) Item(index ...int) float64 {
 	if len(index) != 2 || index[0] >= array.shape[0] || index[1] >= array.shape[1] {
 		panic(fmt.Sprintf("Item indices %v invalid for array shape %v", index, array.shape))
 	}
-	goal := [2]int{index[0], index[1]}
 	if array.transpose {
-		goal[0], goal[1] = goal[1], goal[0]
+		index[0], index[1] = index[1], index[0]
 	}
-	if v, ok := array.values[goal]; ok {
-		return v
-	}
-	return 0
+	return array.values[index[0]][index[1]]
 }
 
 // Add a scalar value to each array element
 func (array *sparseCooF64Matrix) ItemAdd(value float64) NDArray {
 	result := WithValue(value, array.shape...)
-	for pos, v := range array.values {
-		if array.transpose {
-			result.ItemSet(v+value, pos[1], pos[0])
-		} else {
-			result.ItemSet(v+value, pos[0], pos[1])
+	for row, val := range array.values {
+		for col, v := range val {
+			if array.transpose {
+				result.ItemSet(v+value, col, row)
+			} else {
+				result.ItemSet(v+value, row, col)
+			}
 		}
 	}
 	return result
@@ -227,11 +221,13 @@ func (array *sparseCooF64Matrix) ItemAdd(value float64) NDArray {
 // Divide each array element by a scalar value
 func (array *sparseCooF64Matrix) ItemDiv(value float64) NDArray {
 	result := Dense(array.shape...)
-	for pos, v := range array.values {
-		if array.transpose {
-			result.ItemSet(v/value, pos[1], pos[0])
-		} else {
-			result.ItemSet(v/value, pos[0], pos[1])
+	for row, val := range array.values {
+		for col, v := range val {
+			if array.transpose {
+				result.ItemSet(v/value, col, row)
+			} else {
+				result.ItemSet(v/value, row, col)
+			}
 		}
 	}
 	return result
@@ -240,11 +236,13 @@ func (array *sparseCooF64Matrix) ItemDiv(value float64) NDArray {
 // Multiply each array element by a scalar value
 func (array *sparseCooF64Matrix) ItemProd(value float64) NDArray {
 	result := Dense(array.shape...)
-	for pos, v := range array.values {
-		if array.transpose {
-			result.ItemSet(v*value, pos[1], pos[0])
-		} else {
-			result.ItemSet(v*value, pos[0], pos[1])
+	for row, val := range array.values {
+		for col, v := range val {
+			if array.transpose {
+				result.ItemSet(v*value, col, row)
+			} else {
+				result.ItemSet(v*value, row, col)
+			}
 		}
 	}
 	return result
@@ -253,11 +251,13 @@ func (array *sparseCooF64Matrix) ItemProd(value float64) NDArray {
 // Subtract a scalar value from each array element
 func (array *sparseCooF64Matrix) ItemSub(value float64) NDArray {
 	result := WithValue(-value, array.shape...)
-	for pos, v := range array.values {
-		if array.transpose {
-			result.ItemSet(v-value, pos[1], pos[0])
-		} else {
-			result.ItemSet(v-value, pos[0], pos[1])
+	for row, val := range array.values {
+		for col, v := range val {
+			if array.transpose {
+				result.ItemSet(v-value, col, row)
+			} else {
+				result.ItemSet(v-value, row, col)
+			}
 		}
 	}
 	return result
@@ -265,14 +265,16 @@ func (array *sparseCooF64Matrix) ItemSub(value float64) NDArray {
 
 // Set an array element
 func (array *sparseCooF64Matrix) ItemSet(value float64, index ...int) {
-	goal := [2]int{index[0], index[1]}
+	if len(index) != 2 || index[0] >= array.shape[0] || index[1] >= array.shape[1] {
+		panic(fmt.Sprintf("Item indices %v invalid for array shape %v", index, array.shape))
+	}
 	if array.transpose {
-		goal[0], goal[1] = goal[1], goal[0]
+		index[0], index[1] = index[1], index[0]
 	}
 	if value == 0 {
-		delete(array.values, goal)
+		delete(array.values[index[0]], index[1])
 	} else {
-		array.values[goal] = value
+		array.values[index[0]][index[1]] = value
 	}
 }
 
@@ -343,10 +345,8 @@ func (array sparseCooF64Matrix) Row(row int) []float64 {
 		panic(fmt.Sprintf("Can't get row %d from a %dx%d array", row, array.shape[0], array.shape[1]))
 	}
 	result := make([]float64, array.shape[0])
-	for pos, v := range array.values {
-		if pos[0] == row {
-			result[pos[1]] = v
-		}
+	for col, val := range array.values[row] {
+		result[col] = val
 	}
 	return result
 }
@@ -372,6 +372,23 @@ func (array sparseCooF64Matrix) Size() int {
 // to select along each axis.
 func (array sparseCooF64Matrix) Slice(from []int, to []int) NDArray {
 	return Slice(&array, from, to)
+}
+
+// Return a sparse coo copy of the matrix. The method will panic
+// if any off-diagonal elements are nonzero.
+func (array sparseCooF64Matrix) SparseCoo() Matrix {
+	return array.copy()
+}
+
+// Return a sparse diag copy of the matrix. The method will panic
+// if any off-diagonal elements are nonzero.
+func (array sparseCooF64Matrix) SparseDiag() Matrix {
+	m := SparseDiag(array.shape[0], array.shape[1])
+	array.VisitNonzero(func(pos []int, value float64) bool {
+		m.ItemSet(value, pos[0], pos[1])
+		return true
+	})
+	return m
 }
 
 // Ask whether the matrix has a sparse representation (useful for optimization)
@@ -409,11 +426,16 @@ func (array sparseCooF64Matrix) T() Matrix {
 // returns false, iteration is aborted and VisitNonzero() returns false.
 // Otherwise, it returns true.
 func (array sparseCooF64Matrix) Visit(f func(pos []int, value float64) bool) bool {
-	rows, cols := array.shape[0], array.shape[1]
-	for row := 0; row < rows; row++ {
-		for col := 0; col < cols; col++ {
-			if !f([]int{row, col}, array.Item(row, col)) {
-				return false
+	for row := 0; row < array.shape[0]; row++ {
+		for col := 0; col < array.shape[1]; col++ {
+			if array.transpose {
+				if !f([]int{row, col}, array.values[col][row]) {
+					return false
+				}
+			} else {
+				if !f([]int{row, col}, array.values[row][col]) {
+					return false
+				}
 			}
 		}
 	}
@@ -424,15 +446,17 @@ func (array sparseCooF64Matrix) Visit(f func(pos []int, value float64) bool) boo
 // returns false, iteration is aborted and VisitNonzero() returns false.
 // Otherwise, it returns true.
 func (array sparseCooF64Matrix) VisitNonzero(f func(pos []int, value float64) bool) bool {
-	for pos, value := range array.values {
-		var row, col int
-		if array.transpose {
-			row, col = pos[1], pos[0]
-		} else {
-			row, col = pos[0], pos[1]
-		}
-		if !f([]int{row, col}, value) {
-			return false
+	for row, val := range array.values {
+		for col, v := range val {
+			if array.transpose {
+				if !f([]int{col, row}, v) {
+					return false
+				}
+			} else {
+				if !f([]int{row, col}, v) {
+					return false
+				}
+			}
 		}
 	}
 	return true

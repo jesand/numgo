@@ -121,6 +121,75 @@ func TestSparseDiagApply(t *testing.T) {
 	})
 }
 
+func TestSparseDiagConversion(t *testing.T) {
+	Convey("Given an array", t, func() {
+		a := SparseDiag(3, 4, 1, 3, 5)
+
+		Convey("Conversion to Dense works", func() {
+			b := a.Dense()
+			So(b.Dense().Shape(), ShouldResemble, []int{3, 4})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 3, 0, 0,
+				0, 0, 5, 0,
+			})
+		})
+
+		Convey("Conversion of transpose to Dense works", func() {
+			b := a.T().Dense()
+			So(b.Dense().Shape(), ShouldResemble, []int{4, 3})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 3, 0,
+				0, 0, 5,
+				0, 0, 0,
+			})
+		})
+
+		Convey("Conversion to sparse coo works", func() {
+			b := a.SparseCoo()
+			So(b.Dense().Shape(), ShouldResemble, []int{3, 4})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 3, 0, 0,
+				0, 0, 5, 0,
+			})
+		})
+
+		Convey("Conversion of transpose to sparse coo works", func() {
+			b := a.T().SparseCoo()
+			So(b.Dense().Shape(), ShouldResemble, []int{4, 3})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 3, 0,
+				0, 0, 5,
+				0, 0, 0,
+			})
+		})
+
+		Convey("Conversion to diag works", func() {
+			b := a.SparseDiag()
+			So(b.Dense().Shape(), ShouldResemble, []int{3, 4})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0, 0,
+				0, 3, 0, 0,
+				0, 0, 5, 0,
+			})
+		})
+
+		Convey("Conversion of transpose to diag works", func() {
+			b := a.T().SparseDiag()
+			So(b.Dense().Shape(), ShouldResemble, []int{4, 3})
+			So(b.Dense().Array(), ShouldResemble, []float64{
+				1, 0, 0,
+				0, 3, 0,
+				0, 0, 5,
+				0, 0, 0,
+			})
+		})
+	})
+}
+
 func TestSparseDiagColColSetCols(t *testing.T) {
 	Convey("Given an array", t, func() {
 		a := Diag(1, 2, 3)
@@ -284,6 +353,52 @@ func TestSparseDiagItemMath(t *testing.T) {
 					-1, -1, 2,
 				})
 			})
+		})
+	})
+}
+
+func TestSparseDiagMaxMin(t *testing.T) {
+	Convey("Given positive and negative diagonal arrays", t, func() {
+		pos := Diag(1, 2, 3)
+		neg := Diag(-1, -2, -3)
+
+		Convey("Max is right", func() {
+			So(pos.Max(), ShouldEqual, 3)
+			So(neg.Max(), ShouldEqual, 0)
+		})
+
+		Convey("Min is right", func() {
+			So(pos.Min(), ShouldEqual, 0)
+			So(neg.Min(), ShouldEqual, -3)
+		})
+	})
+}
+
+func TestSparseDiagRowRowSetRows(t *testing.T) {
+	Convey("Given an array", t, func() {
+		a := Diag(1, 2, 3)
+
+		Convey("Rows is correct", func() {
+			So(a.Rows(), ShouldEqual, 3)
+		})
+
+		Convey("Row panics with invalid input", func() {
+			So(func() { a.Row(-1) }, ShouldPanic)
+			So(func() { a.Row(3) }, ShouldPanic)
+		})
+
+		Convey("Row works", func() {
+			So(a.Row(0), ShouldResemble, []float64{1, 0, 0})
+			So(a.Row(1), ShouldResemble, []float64{0, 2, 0})
+			So(a.Row(2), ShouldResemble, []float64{0, 0, 3})
+		})
+
+		Convey("RowSet panics", func() {
+			So(func() { a.RowSet(-1, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(3, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1, 2}) }, ShouldPanic)
+			So(func() { a.RowSet(0, []float64{0, 1, 2, 3}) }, ShouldPanic)
 		})
 	})
 }
@@ -458,52 +573,6 @@ func TestSparseDiagVisit(t *testing.T) {
 				0, 2, 0, 0,
 				0, 0, 0, 0,
 			})
-		})
-	})
-}
-
-func TestSparseDiagMaxMin(t *testing.T) {
-	Convey("Given positive and negative diagonal arrays", t, func() {
-		pos := Diag(1, 2, 3)
-		neg := Diag(-1, -2, -3)
-
-		Convey("Max is right", func() {
-			So(pos.Max(), ShouldEqual, 3)
-			So(neg.Max(), ShouldEqual, 0)
-		})
-
-		Convey("Min is right", func() {
-			So(pos.Min(), ShouldEqual, 0)
-			So(neg.Min(), ShouldEqual, -3)
-		})
-	})
-}
-
-func TestSparseDiagRowRowSetRows(t *testing.T) {
-	Convey("Given an array", t, func() {
-		a := Diag(1, 2, 3)
-
-		Convey("Rows is correct", func() {
-			So(a.Rows(), ShouldEqual, 3)
-		})
-
-		Convey("Row panics with invalid input", func() {
-			So(func() { a.Row(-1) }, ShouldPanic)
-			So(func() { a.Row(3) }, ShouldPanic)
-		})
-
-		Convey("Row works", func() {
-			So(a.Row(0), ShouldResemble, []float64{1, 0, 0})
-			So(a.Row(1), ShouldResemble, []float64{0, 2, 0})
-			So(a.Row(2), ShouldResemble, []float64{0, 0, 3})
-		})
-
-		Convey("RowSet panics", func() {
-			So(func() { a.RowSet(-1, []float64{0, 1, 2}) }, ShouldPanic)
-			So(func() { a.RowSet(3, []float64{0, 1, 2}) }, ShouldPanic)
-			So(func() { a.RowSet(0, []float64{0, 1}) }, ShouldPanic)
-			So(func() { a.RowSet(0, []float64{0, 1, 2}) }, ShouldPanic)
-			So(func() { a.RowSet(0, []float64{0, 1, 2, 3}) }, ShouldPanic)
 		})
 	})
 }
