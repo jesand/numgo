@@ -237,6 +237,25 @@ func TestSparseDiagDiag(t *testing.T) {
 	})
 }
 
+func TestSparseDiagDist(t *testing.T) {
+	Convey("Given a SparseDiag matrix", t, func() {
+		m := Diag(1, 2, -1).M()
+
+		Convey("Invalid distance types panic", func() {
+			So(func() { m.Dist(DistType(-1)) }, ShouldPanic)
+		})
+
+		Convey("Euclidean distance works", func() {
+			d := m.Dist(EuclideanDist)
+			So(d.Array(), ShouldResemble, []float64{
+				0, math.Sqrt(5), math.Sqrt(2),
+				math.Sqrt(5), 0, math.Sqrt(5),
+				math.Sqrt(2), math.Sqrt(5), 0,
+			})
+		})
+	})
+}
+
 func TestSparseDiagInverseNormLDivide(t *testing.T) {
 	Convey("Given an invertible diagonal matrix", t, func() {
 		m := Diag(2, 3, 5)

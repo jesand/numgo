@@ -276,6 +276,32 @@ func Concat(axis int, array NDArray, others ...NDArray) NDArray {
 	return result
 }
 
+// Treat the rows as points, and get the pairwise distance between them.
+// Returns a distance matrix D such that D_i,j is the distance between
+// rows i and j.
+func Dist(m Matrix, t DistType) Matrix {
+	var dist = Dense(m.Rows(), m.Rows()).M()
+	for i := 1; i < m.Rows(); i++ {
+		ri := m.Row(i)
+		for j := 0; j <= i; j++ {
+			rj := m.Row(j)
+			var v float64
+			switch t {
+			case EuclideanDist:
+				for idx, riv := range ri {
+					v += math.Pow(riv-rj[idx], 2)
+				}
+				v = math.Sqrt(v)
+			default:
+				panic(fmt.Sprintf("Can't calculate distance of invalid type %v", t))
+			}
+			dist.ItemSet(v, i, j)
+			dist.ItemSet(v, j, i)
+		}
+	}
+	return dist
+}
+
 // Return the element-wise quotient of this array and one or more others.
 // This function defines 0 / 0 = 0, so it's useful for sparse arrays.
 func Div(array NDArray, others ...NDArray) NDArray {

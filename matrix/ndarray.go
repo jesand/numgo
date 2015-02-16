@@ -162,6 +162,9 @@ type NDArray interface {
 	// Set all array elements to the given value
 	Fill(value float64)
 
+	// Get the coordinates for the item at the specified flat position
+	FlatCoord(index int) []int
+
 	// Get an array element in a flattened verison of this array
 	FlatItem(index int) float64
 

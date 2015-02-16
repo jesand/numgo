@@ -281,6 +281,31 @@ func TestSparseCooDiag(t *testing.T) {
 	})
 }
 
+func TestSparseCooDist(t *testing.T) {
+	Convey("Given a SparseCoo matrix", t, func() {
+		m := SparseCoo(3, 2).M()
+		m.ItemSet(1, 0, 0)
+		m.ItemSet(2, 0, 1)
+		m.ItemSet(3, 1, 0)
+		m.ItemSet(2, 1, 1)
+		m.ItemSet(-1, 2, 0)
+		m.ItemSet(4, 2, 1)
+
+		Convey("Invalid distance types panic", func() {
+			So(func() { m.Dist(DistType(-1)) }, ShouldPanic)
+		})
+
+		Convey("Euclidean distance works", func() {
+			d := m.Dist(EuclideanDist)
+			So(d.Array(), ShouldResemble, []float64{
+				0, 2, math.Sqrt(8),
+				2, 0, math.Sqrt(20),
+				math.Sqrt(8), math.Sqrt(20), 0,
+			})
+		})
+	})
+}
+
 func TestSparseCooInverseNormLDivide(t *testing.T) {
 	Convey("Given an invertible diagonal matrix", t, func() {
 		m := cooDiag(2, 3, 5)

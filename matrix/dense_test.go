@@ -295,6 +295,29 @@ func TestDenseDiag(t *testing.T) {
 	})
 }
 
+func TestDenseDist(t *testing.T) {
+	Convey("Given a dense matrix", t, func() {
+		m := M(3, 2,
+			1, 2,
+			3, 2,
+			-1, 4,
+		)
+
+		Convey("Invalid distance types panic", func() {
+			So(func() { m.Dist(DistType(-1)) }, ShouldPanic)
+		})
+
+		Convey("Euclidean distance works", func() {
+			d := m.Dist(EuclideanDist)
+			So(d.Array(), ShouldResemble, []float64{
+				0, 2, math.Sqrt(8),
+				2, 0, math.Sqrt(20),
+				math.Sqrt(8), math.Sqrt(20), 0,
+			})
+		})
+	})
+}
+
 func TestDenseEqual(t *testing.T) {
 	Convey("A dense array equals itself", t, func() {
 		a := Rand(3, 4)

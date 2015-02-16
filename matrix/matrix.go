@@ -8,6 +8,13 @@ import (
 	"math/rand"
 )
 
+// Distance calculations we support
+type DistType int
+
+const (
+	EuclideanDist DistType = iota
+)
+
 // A two dimensional array with some special functionality
 type Matrix interface {
 	NDArray
@@ -23,6 +30,11 @@ type Matrix interface {
 
 	// Get a column vector containing the main diagonal elements of the matrix
 	Diag() Matrix
+
+	// Treat the rows as points, and get the pairwise distance between them.
+	// Returns a distance matrix D such that D_i,j is the distance between
+	// rows i and j.
+	Dist(t DistType) Matrix
 
 	// Get the matrix inverse
 	Inverse() (Matrix, error)

@@ -143,6 +143,13 @@ func (array sparseDiagF64Matrix) Diag() Matrix {
 	return A([]int{len(array.diag), 1}, array.diag...).M()
 }
 
+// Treat the rows as points, and get the pairwise distance between them.
+// Returns a distance matrix D such that D_i,j is the distance between
+// rows i and j.
+func (array sparseDiagF64Matrix) Dist(t DistType) Matrix {
+	return Dist(&array, t)
+}
+
 // Return the element-wise quotient of this array and one or more others.
 // This function defines 0 / 0 = 0, so it's useful for sparse arrays.
 func (array sparseDiagF64Matrix) Div(other ...NDArray) NDArray {
@@ -157,6 +164,11 @@ func (array sparseDiagF64Matrix) Equal(other NDArray) bool {
 // Set all array elements to the given value
 func (array sparseDiagF64Matrix) Fill(value float64) {
 	panic("Can't Fill() a sparse diagonal matrix")
+}
+
+// Get the coordinates for the item at the specified flat position
+func (array sparseDiagF64Matrix) FlatCoord(index int) []int {
+	return flatToNd(array.shape, index)
 }
 
 // Get an array element in a flattened verison of this array

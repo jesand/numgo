@@ -378,6 +378,29 @@ func TestConcat(t *testing.T) {
 	})
 }
 
+func TestDist(t *testing.T) {
+	Convey("Given a matrix", t, func() {
+		m := A([]int{3, 2},
+			1, 2,
+			3, 2,
+			-1, 4,
+		).M()
+
+		Convey("Invalid distance types panic", func() {
+			So(func() { m.Dist(DistType(-1)) }, ShouldPanic)
+		})
+
+		Convey("Euclidean distance works", func() {
+			d := m.Dist(EuclideanDist)
+			So(d.Array(), ShouldResemble, []float64{
+				0, 2, math.Sqrt(8),
+				2, 0, math.Sqrt(20),
+				math.Sqrt(8), math.Sqrt(20), 0,
+			})
+		})
+	})
+}
+
 func TestDiv(t *testing.T) {
 	var inf = math.Inf(+1)
 
