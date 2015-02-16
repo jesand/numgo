@@ -351,6 +351,42 @@ func TestCopy(t *testing.T) {
 	}
 }
 
+func TestHasEdge(t *testing.T) {
+	for _, factory := range graphFactories {
+		Convey("Given a graph with edges (u, v) and (v, w)", t, func() {
+			g := makeTree(factory)
+
+			Convey("HasEdge(u, v) panics when u is invalid", func() {
+				So(func() { g.HasEdge(10, 1) }, ShouldPanic)
+			})
+
+			Convey("HasEdge(u, v) panics when v is invalid", func() {
+				So(func() { g.HasEdge(0, 10) }, ShouldPanic)
+			})
+
+			Convey("HasEdge(u, v) is true", func() {
+				So(g.HasEdge(0, 1), ShouldBeTrue)
+			})
+
+			Convey("HasEdge(u, w) is false", func() {
+				So(g.HasEdge(0, 3), ShouldBeFalse)
+			})
+
+			Convey("HasEdge(v, u) is false", func() {
+				So(g.HasEdge(1, 0), ShouldBeFalse)
+			})
+
+			Convey("HasEdge(w, u) is false", func() {
+				So(g.HasEdge(3, 0), ShouldBeFalse)
+			})
+
+			Convey("HasEdge(w, v) is false", func() {
+				So(g.HasEdge(3, 1), ShouldBeFalse)
+			})
+		})
+	}
+}
+
 func TestHasEdges(t *testing.T) {
 	for _, factory := range graphFactories {
 		Convey("Given an empty graph", t, func() {

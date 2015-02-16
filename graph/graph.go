@@ -62,6 +62,9 @@ type Graph interface {
 	// Make a copy of the graph
 	Copy() Graph
 
+	// Ask whether a given edge exists in the graph
+	HasEdge(from, to NodeID) bool
+
 	// Ask whether the graph contains any edges
 	HasEdges() bool
 
@@ -117,6 +120,9 @@ type Graph interface {
 
 	// Returns the number of nodes and edges in the graph
 	Size() (nodes, edges int)
+
+	// Returns a string representation of the graph
+	String() string
 
 	// Returns a topological sort of the graph, if possible. All nodes will
 	// follow their ancestors in the resulting list. If there is no path between

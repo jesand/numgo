@@ -4,6 +4,7 @@ import (
 	"github.com/jesand/numgo/container"
 	"github.com/jesand/numgo/matrix"
 	"math"
+	"strings"
 )
 
 // Create a graph using a dense adjacency matrix
@@ -109,6 +110,14 @@ func (graph adjacencyGraph) Copy() Graph {
 	}
 	copy(result.nodes[:], graph.nodes[:])
 	return result
+}
+
+// Ask whether a given edge exists in the graph
+func (graph adjacencyGraph) HasEdge(from, to NodeID) bool {
+	if int(from) >= len(graph.nodes) || int(to) >= len(graph.nodes) {
+		panic(ErrInvalidNode{})
+	}
+	return graph.edges.Item(int(from), int(to)) != 0
 }
 
 // Ask whether the graph contains any edges
@@ -275,7 +284,11 @@ func (graph adjacencyGraph) ShortestPathWeight(from, to NodeID) (weight float64)
 // from the node with ID=from to the node with ID=to. The weight will be
 // positive infinity if there is no such path.
 func (graph adjacencyGraph) ShortestPathWeights() (weights [][]float64) {
-	// This is an implementation of the Floyd-Warshall algorithm.
+	return graph.floydWarshallShortestPathWeights()
+}
+
+// The Floyd-Warshall algorithm for all-pairs shortest path weights
+func (graph adjacencyGraph) floydWarshallShortestPathWeights() (weights [][]float64) {
 
 	// Initialize all path weights
 	var numNodes = len(graph.nodes)
@@ -310,6 +323,38 @@ func (graph adjacencyGraph) ShortestPathWeights() (weights [][]float64) {
 // Returns the number of nodes and edges in the graph
 func (graph adjacencyGraph) Size() (nodes, edges int) {
 	return len(graph.nodes), graph.edges.CountNonzero()
+}
+
+// Returns a string representation of the graph
+func (graph adjacencyGraph) String() string {
+	var ss []string
+	printed := make(map[NodeID]bool)
+	for _, r := range graph.Roots() {
+		ss = append(ss, graph.nodeString(r, 0, printed))
+	}
+	return strings.Join(ss, "\n")
+}
+
+func (graph adjacencyGraph) nodeString(node Node, depth int, printed map[NodeID]bool) string {
+	var ss []string
+	for i := 0; i < depth; i++ {
+		ss = append(ss, "|  ")
+	}
+	ss = append(ss, node.Name)
+	ss = append(ss, "\n")
+	printed[node.ID] = true
+	for _, child := range graph.Children(node.ID) {
+		if printed[child.ID] {
+			for i := 0; i < depth+1; i++ {
+				ss = append(ss, "|  ")
+			}
+			ss = append(ss, child.Name)
+			ss = append(ss, " <above>\n")
+		} else {
+			ss = append(ss, graph.nodeString(child, depth+1, printed))
+		}
+	}
+	return strings.Join(ss, "")
 }
 
 // Returns a topological sort of the graph, if possible. All nodes will
