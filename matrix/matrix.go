@@ -2,7 +2,6 @@ package matrix
 
 import (
 	"fmt"
-	"github.com/gonum/blas/goblas"
 	"github.com/gonum/matrix/mat64"
 	"math"
 	"math/rand"
@@ -97,6 +96,11 @@ func M(rows, cols int, array ...float64) Matrix {
 	return A([]int{rows, cols}, array...).M()
 }
 
+// Create a matrix from literal data and the provided shape
+func M2(array ...[]float64) Matrix {
+	return A2(array...).M()
+}
+
 // Create a sparse matrix of the specified dimensionality. This matrix will be
 // stored in coordinate format: each entry is stored as a (x, y, value) triple.
 // The first len(array) elements of the matrix will be initialized to the
@@ -188,20 +192,13 @@ func SparseRandN(rows, cols int, density float64) Matrix {
 	return matrix
 }
 
-// Register a default BLAS engine, if needed
-func InitDefaultBlas() {
-	if mat64.Registered() == nil {
-		mat64.Register(goblas.Blas{})
-	}
-}
-
 // Convert our matrix type to mat64's matrix type
-func toMat64(m Matrix) *mat64.Dense {
+func ToMat64(m Matrix) *mat64.Dense {
 	return mat64.NewDense(m.Rows(), m.Cols(), m.Array())
 }
 
 // Convert mat64's matrix type to our matrix type
-func toMatrix(m mat64.Matrix) Matrix {
+func ToMatrix(m mat64.Matrix) Matrix {
 	rows, cols := m.Dims()
 	array := &denseF64Array{
 		shape: []int{rows, cols},
@@ -217,26 +214,26 @@ func toMatrix(m mat64.Matrix) Matrix {
 
 // Get the matrix inverse
 func Inverse(a Matrix) (Matrix, error) {
-	inv, err := mat64.Inverse(toMat64(a))
+	inv, err := mat64.Inverse(ToMat64(a))
 	if err != nil {
 		return nil, err
 	}
-	return toMatrix(inv), nil
+	return ToMatrix(inv), nil
 }
 
 // Solve for x, where ax = b.
 func LDivide(a, b Matrix) Matrix {
-	var x *mat64.Dense
-	x, err := mat64.Solve(toMat64(a), toMat64(b))
+	var x mat64.Dense
+	err := x.Solve(ToMat64(a), ToMat64(b))
 	if err != nil {
 		return WithValue(math.NaN(), a.Shape()[0], b.Shape()[1]).M()
 	}
-	return toMatrix(x)
+	return ToMatrix(&x)
 }
 
 // Get the matrix norm of the specified ordinality (1, 2, infinity, ...)
 func Norm(m Matrix, ord float64) float64 {
-	return toMat64(m).Norm(ord)
+	return ToMat64(m).Norm(ord)
 }
 
 // Solve is an alias for LDivide

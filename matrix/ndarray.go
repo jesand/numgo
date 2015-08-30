@@ -75,15 +75,6 @@
 // To create a 3x4 sparse coo with half the items randomly populated:
 //     m5 := SparseRand(3, 4, 0.5)
 //     m6 := SparseRandN(3, 4, 0.5)
-//
-// Certain linear algebra methods, particularly in the Matrix interface, rely
-// on BLAS. In order to use it, you will need to register an appropriate engine.
-// See the documentation at https://github.com/gonum/blas for details. You can
-// register a default (native Go) engine by calling InitDefaultBlas().
-// If you see a panic message like
-// "mat64: no blas engine registered: call Register()"
-// then you need to register a BLAS engine. If you don't see this error, then
-// you probably don't need to worry about it.
 package matrix
 
 import (

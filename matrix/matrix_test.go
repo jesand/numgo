@@ -6,15 +6,11 @@ import (
 	"testing"
 )
 
-func init() {
-	InitDefaultBlas()
-}
-
 func TestConversion(t *testing.T) {
 	Convey("Given a Matrix", t, func() {
 		m := Rand(3, 5).M()
-		Convey("Converting it toMat64 works", func() {
-			m2 := toMat64(m)
+		Convey("Converting it ToMat64 works", func() {
+			m2 := ToMat64(m)
 			r, c := m2.Dims()
 			So(r, ShouldEqual, 3)
 			So(c, ShouldEqual, 5)
@@ -25,7 +21,7 @@ func TestConversion(t *testing.T) {
 			}
 
 			Convey("Converting it back to a matrix works", func() {
-				m3 := toMatrix(m2)
+				m3 := ToMatrix(m2)
 				So(m3.Shape(), ShouldResemble, []int{3, 5})
 				for i0 := 0; i0 < 3; i0++ {
 					for i1 := 0; i1 < 5; i1++ {
