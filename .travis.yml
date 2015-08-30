@@ -8,13 +8,14 @@ notifications:
     recipients: jesse@ccs.neu.edu
     on_success: change
     on_failure: always
+language: go
 go:
-- tip
+  - tip
 before_script:
 - go get github.com/smartystreets/goconvey/convey
 before_install:
-- go get github.com/axw/gocov/gocov
-- go get github.com/mattn/goveralls
-- go get golang.org/x/tools/cmd/cover
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 script:
-- $HOME/gopath/bin/goveralls -package ./... -repotoken $COVERALLS_TOKEN
+    - $HOME/gopath/bin/goveralls -service=travis-ci -repotoken $COVERALLS_TOKEN
