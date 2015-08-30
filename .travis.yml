@@ -1,4 +1,5 @@
 language: go
+sudo: false
 env:
   global:
     secure: PEHwJg5ncCwVZcHRkFgTXYMIQHjuU6u6u/Z8ZoAOU8qvHsNanMQhKQaT4kyBfE4Ls/sNXPO53Li/ROWAR75fx4hqrRgQgT95JWCB40t7ftbQoUtEUOa/VU+bQLUC/vcvVDirpBG5zBQNrvKdIH7vMWq6LhXE0hthyiw8+OmVzHU=
